@@ -227,6 +227,7 @@
             `;
             
             document.getElementById('create-btn').addEventListener('click', async () => {
+                console.log('=== CREATING GAME ===');
                 const btn = document.getElementById('create-btn');
                 btn.disabled = true;
                 btn.textContent = 'Creating...';
@@ -240,16 +241,30 @@
                         players: [],
                         isStarted: false,
                         gamePhase: 'waiting',
-                        createdAt: new Date().toISOString()
+                        createdAt: new Date().toISOString(),
+                        createdBy: 'teacher'
                     };
                     
+                    console.log('Game object to save:', currentGame);
+                    
+                    // Save the game
                     await saveToFirebase(gameCode, currentGame);
-                    console.log('Game created successfully');
+                    
+                    // Verify the game was saved by trying to load it
+                    console.log('Verifying game was saved...');
+                    const verifyGame = await loadFromFirebase(gameCode);
+                    console.log('Verification result:', verifyGame);
+                    
+                    if (!verifyGame) {
+                        throw new Error('Game creation verification failed');
+                    }
+                    
+                    console.log('✅ Game created and verified successfully');
                     
                     gameState = 'teacher-dashboard';
                     renderTeacherDashboard();
                 } catch (error) {
-                    console.error('Error creating game:', error);
+                    console.error('❌ Error creating game:', error);
                     showError('setup-error', 'Error creating game. Please try again.');
                     btn.disabled = false;
                     btn.textContent = '🎮 Create Game';
@@ -327,6 +342,18 @@
                 });
             });
             
+            document.getElementById('debug-game').addEventListener('click', () => {
+                const debugInfo = `=== GAME DEBUG INFO ===
+Game Code: ${gameCode}
+Game State: ${JSON.stringify(currentGame, null, 2)}
+LocalStorage Key: game-${gameCode}
+LocalStorage Value: ${localStorage.getItem('game-' + gameCode)}
+Time: ${new Date().toISOString()}`;
+                
+                console.log(debugInfo);
+                alert('Debug info logged to console (F12)');
+            });
+            
             document.getElementById('back-menu').addEventListener('click', () => {
                 stopPolling();
                 gameState = 'menu';
@@ -370,9 +397,17 @@
             });
             
             document.getElementById('join-btn').addEventListener('click', async () => {
+                console.log('=== JOINING GAME ===');
                 const code = document.getElementById('game-code-input').value.toUpperCase().trim();
+                console.log('Attempting to join game with code:', code);
+                
                 if (!code) {
                     showError('join-error', 'Please enter a game code');
+                    return;
+                }
+                
+                if (code.length !== 6) {
+                    showError('join-error', 'Game code must be 6 characters long');
                     return;
                 }
                 
@@ -381,8 +416,18 @@
                 btn.textContent = 'Joining...';
                 
                 try {
+                    console.log('Looking for game...');
                     const game = await loadFromFirebase(code);
+                    console.log('Game search result:', game);
+                    
                     if (!game) {
+                        console.log('❌ No game found for code:', code);
+                        
+                        // Let's also check what games exist in localStorage
+                        console.log('Checking all localStorage games...');
+                        const allKeys = Object.keys(localStorage).filter(key => key.startsWith('game-'));
+                        console.log('Found localStorage game keys:', allKeys);
+                        
                         showError('join-error', 'Game not found! Please check the code.');
                         btn.disabled = false;
                         btn.textContent = '🎯 Join Game';
@@ -390,18 +435,20 @@
                     }
                     
                     if (game.isStarted) {
+                        console.log('❌ Game already started');
                         showError('join-error', 'This game has already started!');
                         btn.disabled = false;
                         btn.textContent = '🎯 Join Game';
                         return;
                     }
                     
+                    console.log('✅ Game found and joinable');
                     gameCode = code;
                     currentGame = game;
                     gameState = 'student-submit';
                     renderStudentSubmit();
                 } catch (error) {
-                    console.error('Error joining game:', error);
+                    console.error('❌ Error joining game:', error);
                     showError('join-error', 'Error joining game. Please try again.');
                     btn.disabled = false;
                     btn.textContent = '🎯 Join Game';
