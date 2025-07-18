@@ -96,37 +96,67 @@
         }
         
         async function saveToFirebase(code, data) {
-            console.log('Saving to Firebase:', code, data);
+            console.log('Saving game data:', code, data);
+            
+            // Always save to localStorage as primary storage for now
             try {
-                const response = await fetch(`${firebaseConfig.databaseURL}/games/${code}.json`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(data)
-                });
+                localStorage.setItem('game-' + code, JSON.stringify(data));
+                console.log('Successfully saved to localStorage');
                 
-                if (!response.ok) {
-                    throw new Error('Firebase failed with status: ' + response.status);
+                // Try Firebase as backup (don't fail if it doesn't work)
+                try {
+                    const response = await fetch(`${firebaseConfig.databaseURL}/games/${code}.json`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(data)
+                    });
+                    
+                    if (response.ok) {
+                        console.log('Also saved to Firebase successfully');
+                    }
+                } catch (firebaseErr) {
+                    console.log('Firebase backup failed (continuing with localStorage):', firebaseErr.message);
                 }
                 
-                console.log('Successfully saved to Firebase');
                 return true;
             } catch (err) {
-                console.log('Firebase failed, using localStorage:', err);
-                localStorage.setItem('game-' + code, JSON.stringify(data));
-                return true;
+                console.error('Critical error: Could not save game data:', err);
+                throw new Error('Failed to save game data');
             }
         }
         
         async function loadFromFirebase(code) {
+            console.log('Loading game data for code:', code);
+            
+            // Try localStorage first (more reliable)
+            try {
+                const saved = localStorage.getItem('game-' + code);
+                if (saved) {
+                    console.log('Found game in localStorage');
+                    return JSON.parse(saved);
+                }
+            } catch (err) {
+                console.log('localStorage read failed:', err);
+            }
+            
+            // Try Firebase as fallback
             try {
                 const response = await fetch(`${firebaseConfig.databaseURL}/games/${code}.json`);
-                const data = await response.json();
-                return data;
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data) {
+                        console.log('Found game in Firebase');
+                        // Save to localStorage for next time
+                        localStorage.setItem('game-' + code, JSON.stringify(data));
+                        return data;
+                    }
+                }
             } catch (err) {
-                console.log('Firebase failed, trying localStorage');
-                const saved = localStorage.getItem('game-' + code);
-                return saved ? JSON.parse(saved) : null;
+                console.log('Firebase read failed:', err);
             }
+            
+            console.log('No game found for code:', code);
+            return null;
         }
         
         function showError(elementId, message) {
@@ -434,13 +464,35 @@
                     return;
                 }
                 
+                if (name.length < 2) {
+                    showError('submit-error', 'Name must be at least 2 characters long!');
+                    return;
+                }
+                
+                if (fact.length < 10) {
+                    showError('submit-error', 'Fun fact must be at least 10 characters long!');
+                    return;
+                }
+                
                 const btn = document.getElementById('submit-btn');
                 btn.disabled = true;
                 btn.textContent = 'Submitting...';
                 
                 try {
+                    console.log('Submitting player info:', { name, fact, gameCode });
+                    
+                    // Refresh current game data first
+                    const latestGame = await loadFromFirebase(gameCode);
+                    if (!latestGame) {
+                        throw new Error('Game no longer exists');
+                    }
+                    
+                    currentGame = latestGame;
+                    
                     // Check if name already exists
-                    const existingPlayer = currentGame.players.find(p => p.name.toLowerCase() === name.toLowerCase());
+                    const existingPlayer = currentGame.players.find(p => 
+                        p.name.toLowerCase().trim() === name.toLowerCase().trim()
+                    );
                     if (existingPlayer) {
                         showError('submit-error', 'Someone with that name has already joined!');
                         btn.disabled = false;
@@ -448,23 +500,44 @@
                         return;
                     }
                     
+                    // Check if game already started
+                    if (currentGame.isStarted) {
+                        showError('submit-error', 'Sorry, this game has already started!');
+                        btn.disabled = false;
+                        btn.textContent = '✅ Submit';
+                        return;
+                    }
+                    
                     // Add player to game
                     currentGame.players = currentGame.players || [];
-                    currentGame.players.push({
-                        id: Date.now(),
+                    const newPlayer = {
+                        id: Date.now() + Math.random(), // Make ID more unique
                         name: name,
                         fact: fact,
                         joinedAt: new Date().toISOString()
-                    });
+                    };
                     
+                    currentGame.players.push(newPlayer);
+                    
+                    console.log('Saving updated game with new player...');
                     await saveToFirebase(gameCode, currentGame);
                     
+                    console.log('Player successfully added!');
                     playerName = name;
                     gameState = 'student-waiting';
                     renderStudentWaiting();
+                    
                 } catch (error) {
                     console.error('Error submitting info:', error);
-                    showError('submit-error', 'Error submitting info. Please try again.');
+                    let errorMessage = 'Error submitting info. Please try again.';
+                    
+                    if (error.message.includes('Game no longer exists')) {
+                        errorMessage = 'This game no longer exists. Please check the game code.';
+                    } else if (error.message.includes('already started')) {
+                        errorMessage = 'This game has already started!';
+                    }
+                    
+                    showError('submit-error', errorMessage);
                     btn.disabled = false;
                     btn.textContent = '✅ Submit';
                 }
