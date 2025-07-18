@@ -245,14 +245,26 @@
             window.selectAnswer = selectAnswer;
             window.playAgain = playAgain;
             
+            function generateGameCode() {
+                return Math.random().toString(36).substr(2, 6).toUpperCase();
+            }
+            
             function saveToFirebase(code, data) {
+                console.log('Attempting to save to Firebase:', code, data);
                 return fetch(`${firebaseConfig.databaseURL}/games/${code}.json`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(data)
+                }).then(response => {
+                    console.log('Firebase response status:', response.status);
+                    if (!response.ok) {
+                        throw new Error('Firebase failed with status: ' + response.status);
+                    }
+                    return response;
                 }).catch(err => {
-                    console.log('Firebase failed, using localStorage');
+                    console.log('Firebase failed, using localStorage:', err);
                     localStorage.setItem('game-' + code, JSON.stringify(data));
+                    return Promise.resolve();
                 });
             }
             
@@ -322,17 +334,29 @@
                 `;
                 
                 document.getElementById('create-btn').onclick = async () => {
-                    gameCode = generateGameCode();
-                    currentGame = {
-                        code: gameCode,
-                        players: [],
-                        isStarted: false,
-                        createdAt: new Date().toISOString()
-                    };
+                    console.log('Create button clicked'); // Debug log
                     
-                    await saveToFirebase(gameCode, currentGame);
-                    gameState = 'teacher-dashboard';
-                    renderTeacherDashboard();
+                    try {
+                        gameCode = generateGameCode();
+                        console.log('Generated code:', gameCode); // Debug log
+                        
+                        currentGame = {
+                            code: gameCode,
+                            players: [],
+                            isStarted: false,
+                            createdAt: new Date().toISOString()
+                        };
+                        
+                        console.log('Saving to Firebase...'); // Debug log
+                        await saveToFirebase(gameCode, currentGame);
+                        console.log('Saved successfully'); // Debug log
+                        
+                        gameState = 'teacher-dashboard';
+                        renderTeacherDashboard();
+                    } catch (error) {
+                        console.error('Error creating game:', error);
+                        alert('Error creating game: ' + error.message);
+                    }
                 };
                 
                 document.getElementById('back-btn').onclick = () => {
@@ -584,7 +608,14 @@
                                 // Mark game as started
                                 currentGame.isStarted = true;
                                 await saveToFirebase(gameCode, currentGame);
-                                alert('Game started! Students will begin playing automatically.');
+                                
+                                // Show confirmation message
+                                alert('🎮 Game started! Students will begin playing automatically.');
+                                
+                                // Update button to show game is running
+                                startBtn.textContent = 'Game in Progress...';
+                                startBtn.disabled = true;
+                                startBtn.className = 'bg-green-500 text-white font-semibold py-4 px-8 rounded-2xl';
                             };
                         } else {
                             startBtn.disabled = true;
