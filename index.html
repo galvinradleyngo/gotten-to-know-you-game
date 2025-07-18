@@ -4,655 +4,425 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Gotten to Know You Game</title>
-    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
-    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body {
             margin: 0;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-                'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-                sans-serif;
-            -webkit-font-smoothing: antialiased;
-            -moz-osx-font-smoothing: grayscale;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        }
+        .loading {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            font-size: 24px;
         }
     </style>
 </head>
 <body>
-    <div id="root"></div>
-    
-    <script type="text/babel">
-        const { useState, useEffect } = React;
+    <div id="app">
+        <div class="loading">
+            <div>
+                <h1>🎮 Gotten to Know You!</h1>
+                <p>Loading game...</p>
+            </div>
+        </div>
+    </div>
 
-        // Simple icons as Unicode
-        const Icons = {
-            Users: () => '👥',
-            Play: () => '▶️',
-            UserPlus: () => '👤+',
-            Trophy: () => '🏆',
-            CheckCircle: () => '✅',
-            XCircle: () => '❌',
-            Clock: () => '⏰'
-        };
-
-        const GetToKnowYouGame = () => {
-            const [gameState, setGameState] = useState('menu');
-            const [gameCode, setGameCode] = useState('');
-            const [playerName, setPlayerName] = useState('');
-            const [playerFact, setPlayerFact] = useState('');
-            const [currentGame, setCurrentGame] = useState(null);
-            const [currentQuestion, setCurrentQuestion] = useState(0);
-            const [score, setScore] = useState(0);
-            const [gameQuestions, setGameQuestions] = useState([]);
-            const [selectedAnswer, setSelectedAnswer] = useState(null);
-            const [showResult, setShowResult] = useState(false);
-            const [timeLeft, setTimeLeft] = useState(15);
-            const [timerActive, setTimerActive] = useState(false);
-            const [loading, setLoading] = useState(false);
-            const [error, setError] = useState('');
-            const [showQRCode, setShowQRCode] = useState(false);
-
-            // Firebase configuration
+    <script>
+        // Test if basic JavaScript works
+        console.log('JavaScript is working!');
+        
+        // Simple game without React - just vanilla JavaScript
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('DOM loaded');
+            
+            const app = document.getElementById('app');
+            
+            // Firebase config
             const firebaseConfig = {
                 databaseURL: "https://gotten-to-know-you-default-rtdb.asia-southeast1.firebasedatabase.app"
             };
-
-            // Simple QR code placeholder
-            const generateQRCodeSVG = (text) => {
-                const size = 200;
-                return `data:image/svg+xml;base64,${btoa(`
-                    <svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" xmlns="http://www.w3.org/2000/svg">
-                        <rect width="${size}" height="${size}" fill="white"/>
-                        <rect x="0" y="0" width="60" height="60" fill="black"/>
-                        <rect x="10" y="10" width="40" height="40" fill="white"/>
-                        <rect x="20" y="20" width="20" height="20" fill="black"/>
-                        <rect x="140" y="0" width="60" height="60" fill="black"/>
-                        <rect x="150" y="10" width="40" height="40" fill="white"/>
-                        <rect x="160" y="20" width="20" height="20" fill="black"/>
-                        <rect x="0" y="140" width="60" height="60" fill="black"/>
-                        <rect x="10" y="150" width="40" height="40" fill="white"/>
-                        <rect x="20" y="160" width="20" height="20" fill="black"/>
-                        <text x="100" y="110" text-anchor="middle" font-size="12" fill="black">QR Code</text>
-                    </svg>
-                `)}`;
-            };
-
-            // URL-based sharing
-            const createGameDataUrl = (gameData) => {
-                const compressed = btoa(JSON.stringify(gameData));
-                return `${window.location.origin}${window.location.pathname}?game=${compressed}`;
-            };
-
-            const getGameFromUrl = () => {
-                const params = new URLSearchParams(window.location.search);
-                const gameParam = params.get('game');
-                if (gameParam) {
-                    try {
-                        return JSON.parse(atob(gameParam));
-                    } catch (e) {
-                        console.error('Invalid game URL');
-                    }
-                }
-                return null;
-            };
-
-            // Firebase functions
-            const createGameInFirebase = async (gameData) => {
-                const response = await fetch(`${firebaseConfig.databaseURL}/games/${gameData.code}.json`, {
+            
+            // Game state
+            let gameState = 'menu';
+            let gameCode = '';
+            let playerName = '';
+            let playerFact = '';
+            let currentGame = null;
+            let players = [];
+            
+            // Utility functions
+            function generateGameCode() {
+                return Math.random().toString(36).substr(2, 6).toUpperCase();
+            }
+            
+            function saveToFirebase(code, data) {
+                return fetch(`${firebaseConfig.databaseURL}/games/${code}.json`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(gameData)
+                    body: JSON.stringify(data)
+                }).catch(err => {
+                    console.log('Firebase failed, using localStorage');
+                    localStorage.setItem('game-' + code, JSON.stringify(data));
                 });
-                
-                if (!response.ok) {
-                    throw new Error(`Firebase error: ${response.status}`);
-                }
-                
-                return gameData;
-            };
-
-            const getGameFromFirebase = async (gameCode) => {
-                const response = await fetch(`${firebaseConfig.databaseURL}/games/${gameCode}.json`);
-                
-                if (!response.ok) {
-                    if (response.status === 404) return null;
-                    throw new Error(`Firebase error: ${response.status}`);
-                }
-                
-                return await response.json();
-            };
-
-            const updateGameInFirebase = async (gameCode, updates) => {
-                const response = await fetch(`${firebaseConfig.databaseURL}/games/${gameCode}.json`, {
-                    method: 'PATCH',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(updates)
-                });
-                
-                if (!response.ok) {
-                    throw new Error(`Firebase error: ${response.status}`);
-                }
-                
-                return await response.json();
-            };
-
-            // Utility functions
-            const generateGameCode = () => {
-                return Math.random().toString(36).substr(2, 6).toUpperCase();
-            };
-
-            const generateQuestions = (players) => {
-                return players.map((player) => {
-                    const otherPlayers = players.filter(p => p.id !== player.id);
-                    const randomOptions = otherPlayers.sort(() => 0.5 - Math.random()).slice(0, Math.min(3, otherPlayers.length));
-                    const allOptions = [player, ...randomOptions].sort(() => 0.5 - Math.random());
-                    
-                    return {
-                        fact: player.fact,
-                        correctAnswer: player.name,
-                        options: allOptions.map(p => p.name),
-                        correctIndex: allOptions.findIndex(p => p.id === player.id)
-                    };
-                });
-            };
-
-            // Check for game in URL
-            useEffect(() => {
-                const urlGame = getGameFromUrl();
-                if (urlGame && !currentGame) {
-                    setCurrentGame(urlGame);
-                    setGameCode(urlGame.code);
-                    setGameState('student-join');
-                }
-            }, []);
-
-            // Real-time polling
-            useEffect(() => {
-                let interval;
-                
-                if (gameCode && (gameState === 'teacher-dashboard' || gameState === 'student-join')) {
-                    interval = setInterval(async () => {
-                        try {
-                            const gameData = await getGameFromFirebase(gameCode);
-                            if (gameData) {
-                                setCurrentGame(prevGame => {
-                                    if (!prevGame || 
-                                        prevGame.players.length !== gameData.players.length || 
-                                        prevGame.isStarted !== gameData.isStarted) {
-                                        return gameData;
-                                    }
-                                    return prevGame;
-                                });
-                                
-                                if (gameState === 'student-join' && gameData.isStarted && currentGame && !currentGame.isStarted) {
-                                    const questions = generateQuestions(gameData.players);
-                                    setGameQuestions(questions);
-                                    setGameState('game-play');
-                                    setCurrentQuestion(0);
-                                    setScore(0);
-                                    setSelectedAnswer(null);
-                                    setShowResult(false);
-                                    setTimeLeft(15);
-                                    setTimerActive(true);
-                                }
-                            }
-                        } catch (error) {
-                            console.error('Error polling game data:', error);
-                        }
-                    }, 2000);
-                }
-                
-                return () => {
-                    if (interval) clearInterval(interval);
-                };
-            }, [gameCode, gameState, currentGame]);
-
-            // Timer effect
-            useEffect(() => {
-                let interval;
-                if (timerActive && timeLeft > 0) {
-                    interval = setInterval(() => {
-                        setTimeLeft(prev => prev - 1);
-                    }, 1000);
-                } else if (timeLeft === 0 && timerActive) {
-                    handleAnswer(-1);
-                }
-                return () => clearInterval(interval);
-            }, [timerActive, timeLeft]);
-
-            // Game functions
-            const createGame = async () => {
-                setLoading(true);
-                setError('');
-                
-                const code = generateGameCode();
-                const newGame = {
-                    code,
-                    players: [],
-                    isStarted: false,
-                    createdAt: new Date().toISOString(),
-                    createdBy: 'teacher'
-                };
-                
-                try {
-                    await Promise.race([
-                        createGameInFirebase(newGame),
-                        new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 3000))
-                    ]);
-                    console.log('✅ Firebase working');
-                } catch (error) {
-                    console.log('📱 Using local mode');
-                }
-                
-                const games = JSON.parse(localStorage.getItem('gtkn-games') || '{}');
-                games[code] = newGame;
-                localStorage.setItem('gtkn-games', JSON.stringify(games));
-                
-                setGameCode(code);
-                setCurrentGame(newGame);
-                setGameState('teacher-dashboard');
-                setLoading(false);
-            };
-
-            const joinGame = async () => {
-                if (!gameCode.trim()) {
-                    setError('Please enter a game code');
-                    return;
-                }
-                
-                setLoading(true);
-                setError('');
-                
-                try {
-                    const game = await getGameFromFirebase(gameCode.toUpperCase());
-                    if (game) {
-                        if (game.isStarted) {
-                            setError('Game has already started!');
-                            return;
-                        }
-                        setCurrentGame(game);
-                        setGameCode(gameCode.toUpperCase());
-                        setGameState('student-submit');
-                        return;
-                    }
-                } catch (firebaseError) {
-                    console.log('Firebase failed, trying localStorage:', firebaseError);
-                }
-                
-                try {
-                    const games = JSON.parse(localStorage.getItem('gtkn-games') || '{}');
-                    const localGame = games[gameCode.toUpperCase()];
-                    
-                    if (localGame) {
-                        if (localGame.isStarted) {
-                            setError('Game has already started!');
-                            return;
-                        }
-                        setCurrentGame(localGame);
-                        setGameCode(gameCode.toUpperCase());
-                        setGameState('student-submit');
-                        return;
-                    }
-                } catch (localError) {
-                    console.log('localStorage also failed:', localError);
-                }
-                
-                setError('Game not found! Please check the code.');
-                setLoading(false);
-            };
-
-            const submitFact = async () => {
-                if (!playerName.trim() || !playerFact.trim()) {
-                    setError('Please fill in both your name and fact!');
-                    return;
-                }
-
-                if (currentGame.players.some(p => p.name.toLowerCase() === playerName.toLowerCase())) {
-                    setError('Someone with this name has already joined! Please use a different name.');
-                    return;
-                }
-
-                setLoading(true);
-                setError('');
-
-                try {
-                    const newPlayer = { 
-                        name: playerName.trim(), 
-                        fact: playerFact.trim(), 
-                        id: Date.now() + Math.random() 
-                    };
-                    
-                    const updatedPlayers = [...currentGame.players, newPlayer];
-                    
-                    try {
-                        await updateGameInFirebase(gameCode, { players: updatedPlayers });
-                    } catch (firebaseError) {
-                        console.log('Firebase update failed, using localStorage');
-                        const games = JSON.parse(localStorage.getItem('gtkn-games') || '{}');
-                        games[gameCode] = { ...currentGame, players: updatedPlayers };
-                        localStorage.setItem('gtkn-games', JSON.stringify(games));
-                    }
-                    
-                    setCurrentGame(prev => ({ ...prev, players: updatedPlayers }));
-                    setGameState('student-join');
-                } catch (error) {
-                    setError('Failed to submit. Please try again.');
-                    console.error('Submit fact error:', error);
-                } finally {
-                    setLoading(false);
-                }
-            };
-
-            const startGame = async () => {
-                if (currentGame.players.length < 2) {
-                    setError('Need at least 2 players to start the game!');
-                    return;
-                }
-
-                setLoading(true);
-                setError('');
-
-                try {
-                    try {
-                        await updateGameInFirebase(gameCode, {
-                            isStarted: true,
-                            startedAt: new Date().toISOString()
-                        });
-                    } catch (firebaseError) {
-                        console.log('Firebase update failed, using localStorage');
-                        const games = JSON.parse(localStorage.getItem('gtkn-games') || '{}');
-                        games[gameCode] = { ...currentGame, isStarted: true, startedAt: new Date().toISOString() };
-                        localStorage.setItem('gtkn-games', JSON.stringify(games));
-                    }
-                    
-                    setCurrentGame(prev => ({ ...prev, isStarted: true }));
-                } catch (error) {
-                    setError('Failed to start game. Please try again.');
-                    console.error('Start game error:', error);
-                } finally {
-                    setLoading(false);
-                }
-            };
-
-            const startGameAsTeacher = async () => {
-                if (currentGame.players.length < 1) {
-                    setError('Need at least 1 player to start the game!');
-                    return;
-                }
-
-                setLoading(true);
-                setError('');
-
-                try {
-                    try {
-                        await updateGameInFirebase(gameCode, {
-                            isStarted: true,
-                            startedAt: new Date().toISOString()
-                        });
-                    } catch (firebaseError) {
-                        console.log('Firebase update failed, using localStorage');
-                        const games = JSON.parse(localStorage.getItem('gtkn-games') || '{}');
-                        games[gameCode] = { ...currentGame, isStarted: true, startedAt: new Date().toISOString() };
-                        localStorage.setItem('gtkn-games', JSON.stringify(games));
-                    }
-
-                    const questions = generateQuestions(currentGame.players);
-                    setGameQuestions(questions);
-                    setGameState('game-play');
-                    setCurrentQuestion(0);
-                    setScore(0);
-                    setSelectedAnswer(null);
-                    setShowResult(false);
-                    setTimeLeft(15);
-                    setTimerActive(true);
-                } catch (error) {
-                    setError('Failed to start game. Please try again.');
-                    console.error('Start game as teacher error:', error);
-                } finally {
-                    setLoading(false);
-                }
-            };
-
-            const handleAnswer = (answerIndex) => {
-                if (showResult) return;
-                
-                setSelectedAnswer(answerIndex);
-                setShowResult(true);
-                setTimerActive(false);
-                
-                if (answerIndex === gameQuestions[currentQuestion].correctIndex) {
-                    setScore(prev => prev + 1);
-                }
-
-                setTimeout(() => {
-                    if (currentQuestion < gameQuestions.length - 1) {
-                        setCurrentQuestion(prev => prev + 1);
-                        setSelectedAnswer(null);
-                        setShowResult(false);
-                        setTimeLeft(15);
-                        setTimerActive(true);
-                    } else {
-                        setGameState('results');
-                    }
-                }, 2000);
-            };
-
-            const resetGame = () => {
-                setGameState('menu');
-                setGameCode('');
-                setPlayerName('');
-                setPlayerFact('');
-                setCurrentGame(null);
-                setCurrentQuestion(0);
-                setScore(0);
-                setGameQuestions([]);
-                setSelectedAnswer(null);
-                setShowResult(false);
-                setTimeLeft(15);
-                setTimerActive(false);
-                setLoading(false);
-                setError('');
-            };
-
-            // Components
-            const ErrorDisplay = ({ message }) => (
-                message ? (
-                    <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-2xl mb-4">
-                        {message}
-                    </div>
-                ) : null
-            );
-
-            const LoadingSpinner = () => (
-                <div className="flex items-center justify-center">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
-                </div>
-            );
-
-            // Main menu
-            if (gameState === 'menu') {
-                return (
-                    <div className="min-h-screen bg-gradient-to-br from-purple-600 via-pink-600 to-blue-600 flex items-center justify-center p-4">
-                        <div className="bg-white rounded-3xl shadow-2xl p-8 max-w-md w-full text-center">
-                            <div className="mb-8">
-                                <div className="bg-gradient-to-r from-purple-500 to-pink-500 rounded-full w-20 h-20 flex items-center justify-center mx-auto mb-4 text-4xl">
-                                    {Icons.Users()}
+            }
+            
+            function loadFromFirebase(code) {
+                return fetch(`${firebaseConfig.databaseURL}/games/${code}.json`)
+                    .then(response => response.json())
+                    .catch(err => {
+                        console.log('Firebase failed, trying localStorage');
+                        const saved = localStorage.getItem('game-' + code);
+                        return saved ? JSON.parse(saved) : null;
+                    });
+            }
+            
+            // Render functions
+            function renderMenu() {
+                app.innerHTML = `
+                    <div class="min-h-screen bg-gradient-to-br from-purple-600 via-pink-600 to-blue-600 flex items-center justify-center p-4">
+                        <div class="bg-white rounded-3xl shadow-2xl p-8 max-w-md w-full text-center">
+                            <div class="mb-8">
+                                <div class="bg-gradient-to-r from-purple-500 to-pink-500 rounded-full w-20 h-20 flex items-center justify-center mx-auto mb-4 text-4xl">
+                                    👥
                                 </div>
-                                <h1 className="text-3xl font-bold text-gray-800 mb-2">Gotten to Know You!</h1>
-                                <p className="text-gray-600">A fun classroom game to learn about each other</p>
+                                <h1 class="text-3xl font-bold text-gray-800 mb-2">Gotten to Know You!</h1>
+                                <p class="text-gray-600">A fun classroom game to learn about each other</p>
                             </div>
                             
-                            <div className="space-y-4">
-                                <button
-                                    onClick={() => setGameState('teacher-setup')}
-                                    className="w-full bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white font-semibold py-4 px-6 rounded-2xl transition-all duration-300 transform hover:scale-105 shadow-lg"
-                                >
-                                    <span className="mr-2">{Icons.Play()}</span>
-                                    I'm a Teacher
+                            <div class="space-y-4">
+                                <button id="teacher-btn" class="w-full bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white font-semibold py-4 px-6 rounded-2xl transition-all duration-300 transform hover:scale-105 shadow-lg">
+                                    ▶️ I'm a Teacher
                                 </button>
                                 
-                                <button
-                                    onClick={() => setGameState('student-join')}
-                                    className="w-full bg-gradient-to-r from-green-500 to-teal-500 hover:from-green-600 hover:to-teal-600 text-white font-semibold py-4 px-6 rounded-2xl transition-all duration-300 transform hover:scale-105 shadow-lg"
-                                >
-                                    <span className="mr-2">{Icons.UserPlus()}</span>
-                                    I'm a Student
+                                <button id="student-btn" class="w-full bg-gradient-to-r from-green-500 to-teal-500 hover:from-green-600 hover:to-teal-600 text-white font-semibold py-4 px-6 rounded-2xl transition-all duration-300 transform hover:scale-105 shadow-lg">
+                                    👤 I'm a Student
                                 </button>
                             </div>
                         </div>
                     </div>
-                );
+                `;
+                
+                document.getElementById('teacher-btn').onclick = () => {
+                    gameState = 'teacher-setup';
+                    renderTeacherSetup();
+                };
+                
+                document.getElementById('student-btn').onclick = () => {
+                    gameState = 'student-join';
+                    renderStudentJoin();
+                };
             }
-
-            // Teacher setup
-            if (gameState === 'teacher-setup') {
-                return (
-                    <div className="min-h-screen bg-gradient-to-br from-blue-600 via-purple-600 to-pink-600 flex items-center justify-center p-4">
-                        <div className="bg-white rounded-3xl shadow-2xl p-8 max-w-md w-full text-center">
-                            <h2 className="text-2xl font-bold text-gray-800 mb-6">Create New Game</h2>
-                            <p className="text-gray-600 mb-8">Click the button below to create a new game and get your game code!</p>
+            
+            function renderTeacherSetup() {
+                app.innerHTML = `
+                    <div class="min-h-screen bg-gradient-to-br from-blue-600 via-purple-600 to-pink-600 flex items-center justify-center p-4">
+                        <div class="bg-white rounded-3xl shadow-2xl p-8 max-w-md w-full text-center">
+                            <h2 class="text-2xl font-bold text-gray-800 mb-6">Create New Game</h2>
+                            <p class="text-gray-600 mb-8">Click the button below to create a new game and get your game code!</p>
                             
-                            <ErrorDisplay message={error} />
-                            
-                            <button
-                                onClick={createGame}
-                                disabled={loading}
-                                className="w-full bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold py-4 px-6 rounded-2xl transition-all duration-300 transform hover:scale-105 shadow-lg mb-4"
-                            >
-                                {loading ? <LoadingSpinner /> : 'Create Game'}
+                            <button id="create-btn" class="w-full bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white font-semibold py-4 px-6 rounded-2xl transition-all duration-300 transform hover:scale-105 shadow-lg mb-4">
+                                Create Game
                             </button>
                             
-                            <button
-                                onClick={() => setGameState('menu')}
-                                className="w-full bg-gray-300 hover:bg-gray-400 text-gray-700 font-semibold py-3 px-6 rounded-2xl transition-all duration-300"
-                            >
+                            <button id="back-btn" class="w-full bg-gray-300 hover:bg-gray-400 text-gray-700 font-semibold py-3 px-6 rounded-2xl transition-all duration-300">
                                 Back to Menu
                             </button>
                         </div>
                     </div>
-                );
+                `;
+                
+                document.getElementById('create-btn').onclick = async () => {
+                    gameCode = generateGameCode();
+                    currentGame = {
+                        code: gameCode,
+                        players: [],
+                        isStarted: false,
+                        createdAt: new Date().toISOString()
+                    };
+                    
+                    await saveToFirebase(gameCode, currentGame);
+                    gameState = 'teacher-dashboard';
+                    renderTeacherDashboard();
+                };
+                
+                document.getElementById('back-btn').onclick = () => {
+                    gameState = 'menu';
+                    renderMenu();
+                };
             }
-
-            // Teacher dashboard - simplified version
-            if (gameState === 'teacher-dashboard') {
-                return (
-                    <div className="min-h-screen bg-gradient-to-br from-blue-600 via-purple-600 to-pink-600 p-4">
-                        <div className="max-w-4xl mx-auto">
-                            <div className="bg-white rounded-3xl shadow-2xl p-8">
-                                <div className="text-center mb-8">
-                                    <h2 className="text-3xl font-bold text-gray-800 mb-2">Teacher Dashboard</h2>
-                                    <div className="bg-gradient-to-r from-yellow-400 to-orange-500 text-white px-6 py-3 rounded-2xl inline-block text-xl font-bold">
-                                        Game Code: {gameCode}
+            
+            function renderTeacherDashboard() {
+                app.innerHTML = `
+                    <div class="min-h-screen bg-gradient-to-br from-blue-600 via-purple-600 to-pink-600 p-4">
+                        <div class="max-w-4xl mx-auto">
+                            <div class="bg-white rounded-3xl shadow-2xl p-8">
+                                <div class="text-center mb-8">
+                                    <h2 class="text-3xl font-bold text-gray-800 mb-2">Teacher Dashboard</h2>
+                                    <div class="bg-gradient-to-r from-yellow-400 to-orange-500 text-white px-6 py-3 rounded-2xl inline-block text-xl font-bold">
+                                        Game Code: ${gameCode}
                                     </div>
                                     
-                                    <div className="mt-4 bg-blue-100 border border-blue-400 text-blue-800 px-4 py-3 rounded-2xl">
-                                        <strong>📱 Students join at: {window.location.host}</strong>
+                                    <div class="mt-4 bg-blue-100 border border-blue-400 text-blue-800 px-4 py-3 rounded-2xl">
+                                        <strong>📱 Students join at: ${window.location.host}</strong>
                                         <br />
-                                        <div className="mt-2">
-                                            <button 
-                                                onClick={() => {
-                                                    const message = `🎮 Join our class game!\n\n1. Go to: ${window.location.host}\n2. Click "I'm a Student"\n3. Enter code: ${gameCode}`;
-                                                    navigator.clipboard.writeText(message);
-                                                    alert('✅ Instructions copied!');
-                                                }}
-                                                className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg font-semibold mr-2"
-                                            >
+                                        <div class="mt-2">
+                                            <button id="copy-instructions" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg font-semibold mr-2">
                                                 📋 Copy Instructions
                                             </button>
-                                            <button 
-                                                onClick={() => setShowQRCode(!showQRCode)}
-                                                className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg font-semibold"
-                                            >
-                                                {showQRCode ? 'Hide' : 'Show'} QR Code
+                                            <button id="show-qr" class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg font-semibold">
+                                                📱 Show QR Info
                                             </button>
                                         </div>
-                                        
-                                        {showQRCode && (
-                                            <div className="mt-4 text-center">
-                                                <img 
-                                                    src={generateQRCodeSVG(createGameDataUrl(currentGame))} 
-                                                    alt="QR Code to join game"
-                                                    className="mx-auto border rounded"
-                                                    style={{width: '200px', height: '200px'}}
-                                                />
-                                                <p className="text-xs mt-2">Students can scan this to join</p>
+                                        <div id="qr-section" class="mt-4 hidden">
+                                            <div class="bg-white p-4 rounded border">
+                                                <p class="text-sm text-gray-700 mb-2">🔗 Share this link:</p>
+                                                <div class="bg-gray-100 p-2 rounded text-xs break-all">${window.location.href}?game=${btoa(JSON.stringify(currentGame))}</div>
+                                                <button id="copy-link" class="mt-2 bg-purple-500 text-white px-3 py-1 rounded text-sm">Copy Link</button>
                                             </div>
-                                        )}
+                                        </div>
                                     </div>
                                 </div>
                                 
-                                <div className="mb-8">
-                                    <h3 className="text-xl font-semibold text-gray-700 mb-4">
-                                        Players ({currentGame?.players?.length || 0})
-                                    </h3>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                        {currentGame?.players?.map((player, index) => (
-                                            <div key={player.id} className="bg-gradient-to-r from-green-100 to-blue-100 p-4 rounded-2xl border-2 border-green-200">
-                                                <div className="flex items-center">
-                                                    <span className="mr-3 text-xl">{Icons.CheckCircle()}</span>
-                                                    <div>
-                                                        <p className="font-semibold text-gray-800">{player.name}</p>
-                                                        <p className="text-sm text-gray-600">✓ Fact submitted</p>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
+                                <div class="mb-8">
+                                    <h3 class="text-xl font-semibold text-gray-700 mb-4">Players (<span id="player-count">0</span>)</h3>
+                                    <div id="players-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
                                 </div>
                                 
-                                <ErrorDisplay message={error} />
-                                
-                                <div className="text-center space-y-4">
-                                    {!currentGame?.isStarted ? (
-                                        <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                                            <button
-                                                onClick={startGame}
-                                                disabled={loading || !currentGame?.players?.length || currentGame.players.length < 2}
-                                                className="bg-gradient-to-r from-green-500 to-teal-500 hover:from-green-600 hover:to-teal-600 disabled:from-gray-400 disabled:to-gray-500 text-white font-semibold py-4 px-8 rounded-2xl transition-all duration-300 transform hover:scale-105 shadow-lg disabled:cursor-not-allowed"
-                                            >
-                                                {loading ? <LoadingSpinner /> : 'Start Game (Students)'}
-                                            </button>
-                                            
-                                            <button
-                                                onClick={startGameAsTeacher}
-                                                disabled={loading || !currentGame?.players?.length}
-                                                className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 disabled:from-gray-400 disabled:to-gray-500 text-white font-semibold py-4 px-8 rounded-2xl transition-all duration-300 transform hover:scale-105 shadow-lg disabled:cursor-not-allowed"
-                                            >
-                                                {loading ? <LoadingSpinner /> : 'Play as Teacher'}
-                                            </button>
-                                        </div>
-                                    ) : (
-                                        <div className="bg-green-100 p-6 rounded-2xl">
-                                            <h3 className="text-xl font-semibold text-green-800 mb-2">Game in Progress!</h3>
-                                            <p className="text-green-700">Students are now playing the game.</p>
-                                        </div>
-                                    )}
+                                <div class="text-center space-y-4">
+                                    <button id="start-game" class="bg-gradient-to-r from-green-500 to-teal-500 hover:from-green-600 hover:to-teal-600 text-white font-semibold py-4 px-8 rounded-2xl transition-all duration-300 transform hover:scale-105 shadow-lg" disabled>
+                                        Start Game (Need 2+ Players)
+                                    </button>
                                     
-                                    <button
-                                        onClick={resetGame}
-                                        className="block mx-auto bg-gray-300 hover:bg-gray-400 text-gray-700 font-semibold py-3 px-6 rounded-2xl transition-all duration-300"
-                                    >
+                                    <br>
+                                    <button id="back-menu" class="bg-gray-300 hover:bg-gray-400 text-gray-700 font-semibold py-3 px-6 rounded-2xl transition-all duration-300">
                                         Back to Menu
                                     </button>
                                 </div>
                             </div>
                         </div>
                     </div>
-                );
+                `;
+                
+                // Event listeners
+                document.getElementById('copy-instructions').onclick = () => {
+                    const message = `🎮 Join our class game!\n\n1. Go to: ${window.location.host}\n2. Click "I'm a Student"\n3. Enter code: ${gameCode}`;
+                    navigator.clipboard.writeText(message);
+                    alert('✅ Instructions copied!');
+                };
+                
+                document.getElementById('show-qr').onclick = () => {
+                    const qrSection = document.getElementById('qr-section');
+                    qrSection.classList.toggle('hidden');
+                };
+                
+                document.getElementById('copy-link').onclick = () => {
+                    const link = `${window.location.href}?game=${btoa(JSON.stringify(currentGame))}`;
+                    navigator.clipboard.writeText(link);
+                    alert('✅ Link copied!');
+                };
+                
+                document.getElementById('back-menu').onclick = () => {
+                    gameState = 'menu';
+                    renderMenu();
+                };
+                
+                // Poll for players
+                pollForPlayers();
             }
-
-            // Student components simplified - I'll continue with the rest...
-            return <div>Loading...</div>;
-        };
-
-        // Wait for DOM to be ready
-        document.addEventListener('DOMContentLoaded', function() {
-            const container = document.getElementById('root');
-            if (container) {
-                const root = ReactDOM.createRoot(container);
-                root.render(React.createElement(GetToKnowYouGame));
+            
+            function renderStudentJoin() {
+                app.innerHTML = `
+                    <div class="min-h-screen bg-gradient-to-br from-green-600 via-teal-600 to-blue-600 flex items-center justify-center p-4">
+                        <div class="bg-white rounded-3xl shadow-2xl p-8 max-w-md w-full text-center">
+                            <h2 class="text-2xl font-bold text-gray-800 mb-6">Join Game</h2>
+                            
+                            <div class="space-y-6">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Game Code</label>
+                                    <input type="text" id="game-code-input" placeholder="Enter game code" class="w-full px-4 py-3 border-2 border-gray-300 rounded-2xl focus:border-blue-500 focus:outline-none text-center text-lg font-semibold" maxlength="6">
+                                </div>
+                                
+                                <button id="join-btn" class="w-full bg-gradient-to-r from-green-500 to-teal-500 hover:from-green-600 hover:to-teal-600 text-white font-semibold py-4 px-6 rounded-2xl transition-all duration-300 transform hover:scale-105 shadow-lg">
+                                    Join Game
+                                </button>
+                                
+                                <div id="error-msg" class="hidden bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-2xl"></div>
+                            </div>
+                            
+                            <button id="back-btn2" class="w-full bg-gray-300 hover:bg-gray-400 text-gray-700 font-semibold py-3 px-6 rounded-2xl transition-all duration-300 mt-4">
+                                Back to Menu
+                            </button>
+                        </div>
+                    </div>
+                `;
+                
+                document.getElementById('join-btn').onclick = async () => {
+                    const code = document.getElementById('game-code-input').value.toUpperCase();
+                    if (!code) {
+                        showError('Please enter a game code');
+                        return;
+                    }
+                    
+                    const game = await loadFromFirebase(code);
+                    if (!game) {
+                        showError('Game not found! Please check the code.');
+                        return;
+                    }
+                    
+                    gameCode = code;
+                    currentGame = game;
+                    gameState = 'student-submit';
+                    renderStudentSubmit();
+                };
+                
+                document.getElementById('back-btn2').onclick = () => {
+                    gameState = 'menu';
+                    renderMenu();
+                };
             }
+            
+            function renderStudentSubmit() {
+                app.innerHTML = `
+                    <div class="min-h-screen bg-gradient-to-br from-green-600 via-teal-600 to-blue-600 flex items-center justify-center p-4">
+                        <div class="bg-white rounded-3xl shadow-2xl p-8 max-w-md w-full">
+                            <h2 class="text-2xl font-bold text-gray-800 mb-6 text-center">Submit Your Info</h2>
+                            
+                            <div class="space-y-6">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Your Name</label>
+                                    <input type="text" id="player-name" placeholder="Enter your name" class="w-full px-4 py-3 border-2 border-gray-300 rounded-2xl focus:border-blue-500 focus:outline-none" maxlength="30">
+                                </div>
+                                
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Fun Fact About You</label>
+                                    <textarea id="player-fact" placeholder="Share something interesting about yourself..." class="w-full px-4 py-3 border-2 border-gray-300 rounded-2xl focus:border-blue-500 focus:outline-none resize-none h-24" maxlength="150"></textarea>
+                                    <p class="text-sm text-gray-500 mt-1"><span id="char-count">0</span>/150</p>
+                                </div>
+                                
+                                <button id="submit-btn" class="w-full bg-gradient-to-r from-green-500 to-teal-500 hover:from-green-600 hover:to-teal-600 text-white font-semibold py-4 px-6 rounded-2xl transition-all duration-300 transform hover:scale-105 shadow-lg">
+                                    Submit
+                                </button>
+                                
+                                <div id="error-msg2" class="hidden bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-2xl"></div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                
+                document.getElementById('player-fact').oninput = (e) => {
+                    document.getElementById('char-count').textContent = e.target.value.length;
+                };
+                
+                document.getElementById('submit-btn').onclick = async () => {
+                    const name = document.getElementById('player-name').value.trim();
+                    const fact = document.getElementById('player-fact').value.trim();
+                    
+                    if (!name || !fact) {
+                        showError2('Please fill in both your name and fact!');
+                        return;
+                    }
+                    
+                    // Add player to game
+                    currentGame.players = currentGame.players || [];
+                    currentGame.players.push({
+                        id: Date.now(),
+                        name: name,
+                        fact: fact
+                    });
+                    
+                    await saveToFirebase(gameCode, currentGame);
+                    
+                    // Show success
+                    app.innerHTML = `
+                        <div class="min-h-screen bg-gradient-to-br from-green-600 via-teal-600 to-blue-600 flex items-center justify-center p-4">
+                            <div class="bg-white rounded-3xl shadow-2xl p-8 max-w-md w-full text-center">
+                                <div class="text-6xl mb-4">✅</div>
+                                <h2 class="text-2xl font-bold text-gray-800 mb-4">Successfully Joined!</h2>
+                                <p class="text-gray-600 mb-4">Hi ${name}! Waiting for the teacher to start the game...</p>
+                                <p class="text-sm text-gray-500">Game will start automatically when teacher begins</p>
+                            </div>
+                        </div>
+                    `;
+                };
+            }
+            
+            function pollForPlayers() {
+                setInterval(async () => {
+                    if (gameState === 'teacher-dashboard' && gameCode) {
+                        const game = await loadFromFirebase(gameCode);
+                        if (game && game.players) {
+                            currentGame = game;
+                            updatePlayersList(game.players);
+                        }
+                    }
+                }, 2000);
+            }
+            
+            function updatePlayersList(players) {
+                const playersList = document.getElementById('players-list');
+                const playerCount = document.getElementById('player-count');
+                const startBtn = document.getElementById('start-game');
+                
+                if (playersList) {
+                    playerCount.textContent = players.length;
+                    playersList.innerHTML = players.map(player => `
+                        <div class="bg-gradient-to-r from-green-100 to-blue-100 p-4 rounded-2xl border-2 border-green-200">
+                            <div class="flex items-center">
+                                <span class="mr-3 text-xl">✅</span>
+                                <div>
+                                    <p class="font-semibold text-gray-800">${player.name}</p>
+                                    <p class="text-sm text-gray-600">✓ Fact submitted</p>
+                                </div>
+                            </div>
+                        </div>
+                    `).join('');
+                    
+                    if (startBtn) {
+                        if (players.length >= 2) {
+                            startBtn.disabled = false;
+                            startBtn.textContent = 'Start Game!';
+                            startBtn.onclick = () => alert('Game starting! (Demo version)');
+                        } else {
+                            startBtn.disabled = true;
+                            startBtn.textContent = `Start Game (Need ${2 - players.length} more players)`;
+                        }
+                    }
+                }
+            }
+            
+            function showError(msg) {
+                const errorDiv = document.getElementById('error-msg');
+                errorDiv.textContent = msg;
+                errorDiv.classList.remove('hidden');
+            }
+            
+            function showError2(msg) {
+                const errorDiv = document.getElementById('error-msg2');
+                errorDiv.textContent = msg;
+                errorDiv.classList.remove('hidden');
+            }
+            
+            // Check for game URL parameter
+            const urlParams = new URLSearchParams(window.location.search);
+            const gameParam = urlParams.get('game');
+            if (gameParam) {
+                try {
+                    currentGame = JSON.parse(atob(gameParam));
+                    gameCode = currentGame.code;
+                    gameState = 'student-submit';
+                    renderStudentSubmit();
+                    return;
+                } catch (e) {
+                    console.error('Invalid game URL');
+                }
+            }
+            
+            // Start with menu
+            renderMenu();
         });
     </script>
 </body>
