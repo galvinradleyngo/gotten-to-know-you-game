@@ -53,11 +53,197 @@
             let playerFact = '';
             let currentGame = null;
             let players = [];
+            let gameQuestions = [];
+            let currentQuestion = 0;
+            let score = 0;
+            let timeLeft = 15;
+            let timerInterval = null;
             
             // Utility functions
-            function generateGameCode() {
-                return Math.random().toString(36).substr(2, 6).toUpperCase();
+            function generateQuestions(players) {
+                return players.map((player) => {
+                    const otherPlayers = players.filter(p => p.id !== player.id);
+                    const randomOptions = otherPlayers.sort(() => 0.5 - Math.random()).slice(0, Math.min(3, otherPlayers.length));
+                    const allOptions = [player, ...randomOptions].sort(() => 0.5 - Math.random());
+                    
+                    return {
+                        fact: player.fact,
+                        correctAnswer: player.name,
+                        options: allOptions.map(p => p.name),
+                        correctIndex: allOptions.findIndex(p => p.id === player.id)
+                    };
+                });
             }
+            
+            function startGamePlay() {
+                gameQuestions = generateQuestions(currentGame.players);
+                currentQuestion = 0;
+                score = 0;
+                gameState = 'game-play';
+                renderGamePlay();
+            }
+            
+            function renderGamePlay() {
+                if (!gameQuestions.length || currentQuestion >= gameQuestions.length) {
+                    renderResults();
+                    return;
+                }
+                
+                const question = gameQuestions[currentQuestion];
+                timeLeft = 15;
+                
+                app.innerHTML = `
+                    <div class="min-h-screen bg-gradient-to-br from-purple-600 via-pink-600 to-red-600 p-4">
+                        <div class="max-w-2xl mx-auto">
+                            <div class="bg-white rounded-3xl shadow-2xl p-8">
+                                <div class="text-center mb-8">
+                                    <div class="flex justify-between items-center mb-4">
+                                        <div class="bg-gradient-to-r from-blue-500 to-purple-500 text-white px-4 py-2 rounded-2xl">
+                                            Question ${currentQuestion + 1}/${gameQuestions.length}
+                                        </div>
+                                        <div class="bg-gradient-to-r from-yellow-400 to-orange-500 text-white px-4 py-2 rounded-2xl">
+                                            Score: ${score}
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="flex justify-center mb-4">
+                                        <div id="timer" class="w-16 h-16 rounded-full flex items-center justify-center text-2xl font-bold bg-gradient-to-r from-green-400 to-blue-500 text-white">
+                                            ⏰ ${timeLeft}
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="mb-8">
+                                    <h3 class="text-xl font-semibold text-gray-800 mb-4 text-center">Who said this?</h3>
+                                    <div class="bg-gradient-to-r from-blue-100 to-purple-100 p-6 rounded-2xl border-2 border-blue-200">
+                                        <p class="text-lg text-gray-800 text-center italic">"${question.fact}"</p>
+                                    </div>
+                                </div>
+                                
+                                <div class="space-y-3" id="options-container">
+                                    ${question.options.map((option, index) => `
+                                        <button onclick="selectAnswer(${index})" class="option-btn w-full p-4 rounded-2xl font-semibold transition-all duration-300 transform hover:scale-105 bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600 text-white shadow-lg">
+                                            ${option}
+                                        </button>
+                                    `).join('')}
+                                </div>
+                                
+                                <div id="result-message" class="text-center mt-6 hidden">
+                                    <p class="text-lg font-semibold text-gray-800"></p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                
+                // Start timer
+                timerInterval = setInterval(() => {
+                    timeLeft--;
+                    const timerEl = document.getElementById('timer');
+                    if (timerEl) {
+                        timerEl.innerHTML = `⏰ ${timeLeft}`;
+                        if (timeLeft <= 5) {
+                            timerEl.className = 'w-16 h-16 rounded-full flex items-center justify-center text-2xl font-bold bg-red-500 text-white animate-pulse';
+                        }
+                    }
+                    
+                    if (timeLeft <= 0) {
+                        selectAnswer(-1); // Time's up
+                    }
+                }, 1000);
+            }
+            
+            function selectAnswer(selectedIndex) {
+                if (timerInterval) {
+                    clearInterval(timerInterval);
+                    timerInterval = null;
+                }
+                
+                const question = gameQuestions[currentQuestion];
+                const options = document.querySelectorAll('.option-btn');
+                const resultMessage = document.getElementById('result-message');
+                
+                // Disable all buttons
+                options.forEach((btn, index) => {
+                    btn.disabled = true;
+                    btn.onclick = null;
+                    
+                    if (index === question.correctIndex) {
+                        btn.className = 'option-btn w-full p-4 rounded-2xl font-semibold bg-green-500 text-white';
+                        btn.innerHTML += ' ✅';
+                    } else if (index === selectedIndex) {
+                        btn.className = 'option-btn w-full p-4 rounded-2xl font-semibold bg-red-500 text-white';
+                        btn.innerHTML += ' ❌';
+                    } else {
+                        btn.className = 'option-btn w-full p-4 rounded-2xl font-semibold bg-gray-300 text-gray-700';
+                    }
+                });
+                
+                // Show result
+                if (selectedIndex === question.correctIndex) {
+                    score++;
+                    resultMessage.innerHTML = '<p class="text-lg font-semibold text-gray-800">🎉 Correct!</p>';
+                } else {
+                    resultMessage.innerHTML = '<p class="text-lg font-semibold text-gray-800">😅 Not quite!</p>';
+                }
+                resultMessage.classList.remove('hidden');
+                
+                // Move to next question after 2 seconds
+                setTimeout(() => {
+                    currentQuestion++;
+                    renderGamePlay();
+                }, 2000);
+            }
+            
+            function renderResults() {
+                const percentage = Math.round((score / gameQuestions.length) * 100);
+                
+                app.innerHTML = `
+                    <div class="min-h-screen bg-gradient-to-br from-yellow-600 via-orange-600 to-red-600 flex items-center justify-center p-4">
+                        <div class="bg-white rounded-3xl shadow-2xl p-8 max-w-md w-full text-center">
+                            <div class="mb-8">
+                                <div class="bg-gradient-to-r from-yellow-400 to-orange-500 rounded-full w-20 h-20 flex items-center justify-center mx-auto mb-4 text-4xl">
+                                    🏆
+                                </div>
+                                <h2 class="text-3xl font-bold text-gray-800 mb-2">Game Complete!</h2>
+                            </div>
+                            
+                            <div class="space-y-6">
+                                <div class="bg-gradient-to-r from-yellow-100 to-orange-100 p-6 rounded-2xl">
+                                    <h3 class="text-2xl font-bold text-gray-800 mb-2">Your Score</h3>
+                                    <div class="text-5xl font-bold text-orange-600 mb-2">${score}</div>
+                                    <div class="text-lg text-gray-600">out of ${gameQuestions.length} questions</div>
+                                    <div class="text-2xl font-semibold text-gray-800 mt-2">${percentage}%</div>
+                                </div>
+                                
+                                <div class="flex justify-center text-6xl">
+                                    ${percentage >= 80 ? '🏆' : percentage >= 60 ? '🥈' : percentage >= 40 ? '🥉' : '🎯'}
+                                </div>
+                                
+                                <p class="text-lg text-gray-600">
+                                    ${percentage >= 80 ? 'Amazing! You really know your classmates!' :
+                                      percentage >= 60 ? 'Great job! You know your classmates well.' :
+                                      percentage >= 40 ? 'Not bad! There\'s still more to learn.' :
+                                      'Time to get to know your classmates better!'}
+                                </p>
+                                
+                                <button onclick="playAgain()" class="w-full bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-semibold py-4 px-6 rounded-2xl transition-all duration-300 transform hover:scale-105 shadow-lg">
+                                    Play Again
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+            
+            function playAgain() {
+                gameState = 'menu';
+                renderMenu();
+            }
+            
+            // Make functions global so onclick can access them
+            window.selectAnswer = selectAnswer;
+            window.playAgain = playAgain;
             
             function saveToFirebase(code, data) {
                 return fetch(`${firebaseConfig.databaseURL}/games/${code}.json`, {
@@ -336,7 +522,9 @@
                     
                     await saveToFirebase(gameCode, currentGame);
                     
-                    // Show success
+                    // Show success and wait for game to start
+                    gameState = 'student-waiting';
+                    playerName = name;
                     app.innerHTML = `
                         <div class="min-h-screen bg-gradient-to-br from-green-600 via-teal-600 to-blue-600 flex items-center justify-center p-4">
                             <div class="bg-white rounded-3xl shadow-2xl p-8 max-w-md w-full text-center">
@@ -344,6 +532,7 @@
                                 <h2 class="text-2xl font-bold text-gray-800 mb-4">Successfully Joined!</h2>
                                 <p class="text-gray-600 mb-4">Hi ${name}! Waiting for the teacher to start the game...</p>
                                 <p class="text-sm text-gray-500">Game will start automatically when teacher begins</p>
+                                <div class="mt-4 text-sm text-gray-400">Players joined: ${currentGame.players.length}</div>
                             </div>
                         </div>
                     `;
@@ -357,6 +546,12 @@
                         if (game && game.players) {
                             currentGame = game;
                             updatePlayersList(game.players);
+                        }
+                    } else if (gameState === 'student-waiting' && gameCode) {
+                        const game = await loadFromFirebase(gameCode);
+                        if (game && game.isStarted) {
+                            currentGame = game;
+                            startGamePlay();
                         }
                     }
                 }, 2000);
@@ -385,7 +580,12 @@
                         if (players.length >= 2) {
                             startBtn.disabled = false;
                             startBtn.textContent = 'Start Game!';
-                            startBtn.onclick = () => alert('Game starting! (Demo version)');
+                            startBtn.onclick = async () => {
+                                // Mark game as started
+                                currentGame.isStarted = true;
+                                await saveToFirebase(gameCode, currentGame);
+                                alert('Game started! Students will begin playing automatically.');
+                            };
                         } else {
                             startBtn.disabled = true;
                             startBtn.textContent = `Start Game (Need ${2 - players.length} more players)`;
