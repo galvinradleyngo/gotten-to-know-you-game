@@ -19,635 +19,358 @@
             color: white;
             font-size: 24px;
         }
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-top: 4px solid white;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-left: 15px;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .fade-in {
+            animation: fadeIn 0.5s ease-in;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
     </style>
 </head>
 <body>
     <div id="app">
         <div class="loading">
-            <div>
-                <h1>🎮 Gotten to Know You!</h1>
-                <p>Loading game...</p>
+            <div class="text-center">
+                <h1 class="text-4xl font-bold mb-4">🎮 Gotten to Know You!</h1>
+                <div class="flex items-center justify-center">
+                    <p class="text-xl">Loading game...</p>
+                    <div class="spinner"></div>
+                </div>
             </div>
         </div>
     </div>
 
     <script>
-        // Test if basic JavaScript works
-        console.log('JavaScript is working!');
+        console.log('Game script starting...');
         
-        // Simple game without React - just vanilla JavaScript
-        document.addEventListener('DOMContentLoaded', function() {
-            console.log('DOM loaded');
-            
-            const app = document.getElementById('app');
-            
-            // Firebase config
-            const firebaseConfig = {
-                databaseURL: "https://gotten-to-know-you-default-rtdb.asia-southeast1.firebasedatabase.app"
-            };
-            
-            // Game state
-            let gameState = 'menu';
-            let gameCode = '';
-            let playerName = '';
-            let playerFact = '';
-            let currentGame = null;
-            let players = [];
-            let gameQuestions = [];
-            let currentQuestion = 0;
-            let score = 0;
-            let timeLeft = 15;
-            let timerInterval = null;
-            let gamePhase = 'waiting'; // waiting, question, results, final
-            
-            // Utility functions
-            function generateQuestions(players) {
-                return players.map((player) => {
-                    const otherPlayers = players.filter(p => p.id !== player.id);
-                    const randomOptions = otherPlayers.sort(() => 0.5 - Math.random()).slice(0, Math.min(3, otherPlayers.length));
-                    const allOptions = [player, ...randomOptions].sort(() => 0.5 - Math.random());
-                    
-                    return {
-                        fact: player.fact,
-                        correctAnswer: player.name,
-                        options: allOptions.map(p => p.name),
-                        correctIndex: allOptions.findIndex(p => p.id === player.id)
-                    };
-                });
-            }
-            
-            function renderTeacherGameControl() {
-                const question = gameQuestions[currentQuestion];
+        // Game state variables
+        let gameState = 'menu';
+        let gameCode = '';
+        let playerName = '';
+        let currentGame = null;
+        let gameQuestions = [];
+        let currentQuestion = 0;
+        let score = 0;
+        let timeLeft = 15;
+        let timerInterval = null;
+        let pollInterval = null;
+        
+        // Firebase config (fallback to localStorage if Firebase fails)
+        const firebaseConfig = {
+            databaseURL: "https://gotten-to-know-you-default-rtdb.asia-southeast1.firebasedatabase.app"
+        };
+        
+        // Utility functions
+        function generateGameCode() {
+            return Math.random().toString(36).substr(2, 6).toUpperCase();
+        }
+        
+        function generateQuestions(players) {
+            console.log('Generating questions for players:', players);
+            return players.map((player) => {
+                const otherPlayers = players.filter(p => p.id !== player.id);
+                const randomOptions = otherPlayers.sort(() => 0.5 - Math.random()).slice(0, Math.min(3, otherPlayers.length));
+                const allOptions = [player, ...randomOptions].sort(() => 0.5 - Math.random());
                 
-                app.innerHTML = `
-                    <div class="min-h-screen bg-gradient-to-br from-purple-600 via-pink-600 to-red-600 p-4">
-                        <div class="max-w-6xl mx-auto">
-                            <div class="bg-white rounded-3xl shadow-2xl p-8">
-                                <!-- Header -->
-                                <div class="text-center mb-8">
-                                    <div class="flex justify-between items-center mb-4">
-                                        <div class="bg-gradient-to-r from-blue-500 to-purple-500 text-white px-6 py-3 rounded-2xl text-lg font-bold">
-                                            Question ${currentQuestion + 1}/${gameQuestions.length}
-                                        </div>
-                                        <div class="bg-gradient-to-r from-yellow-400 to-orange-500 text-white px-6 py-3 rounded-2xl text-lg font-bold">
-                                            Game Code: ${gameCode}
-                                        </div>
-                                    </div>
-                                    
-                                    <div class="flex justify-center mb-6">
-                                        <div id="teacher-timer" class="w-24 h-24 rounded-full flex items-center justify-center text-3xl font-bold bg-gradient-to-r from-green-400 to-blue-500 text-white">
-                                            ⏰ ${timeLeft}
-                                        </div>
-                                    </div>
-                                </div>
-                                
-                                <!-- Main Question Display -->
-                                <div class="mb-8">
-                                    <h2 class="text-4xl font-bold text-center text-gray-800 mb-6">Guess who wrote this...</h2>
-                                    <div class="bg-gradient-to-r from-blue-100 to-purple-100 p-8 rounded-3xl border-4 border-blue-200 text-center">
-                                        <p class="text-3xl text-gray-800 italic font-medium">"${question.fact}"</p>
-                                    </div>
-                                </div>
-                                
-                                <!-- Answer Options for Display -->
-                                <div class="grid grid-cols-2 gap-6 mb-8">
-                                    ${question.options.map((option, index) => `
-                                        <div class="bg-gradient-to-r ${getOptionColor(index)} p-6 rounded-2xl text-center">
-                                            <div class="text-2xl font-bold text-white mb-2">${String.fromCharCode(65 + index)}</div>
-                                            <div class="text-xl font-semibold text-white">${option}</div>
-                                        </div>
-                                    `).join('')}
-                                </div>
-                                
-                                <!-- Teacher Controls -->
-                                <div class="text-center space-y-4">
-                                    <div class="bg-gray-100 p-4 rounded-2xl">
-                                        <p class="text-lg font-semibold text-gray-700">Students are answering on their devices...</p>
-                                        <p class="text-sm text-gray-600">Timer will advance automatically</p>
-                                    </div>
-                                    
-                                    <button id="next-question-btn" class="bg-gradient-to-r from-green-500 to-teal-500 hover:from-green-600 hover:to-teal-600 text-white font-semibold py-3 px-8 rounded-2xl transition-all duration-300 disabled:opacity-50" disabled>
-                                        Next Question (${timeLeft}s)
-                                    </button>
-                                    
-                                    <button id="end-game-btn" class="block mx-auto bg-red-500 hover:bg-red-600 text-white font-semibold py-2 px-6 rounded-2xl transition-all duration-300">
-                                        End Game
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                `;
-                
-                // Start timer
-                startTeacherTimer();
-                
-                document.getElementById('end-game-btn').onclick = () => {
-                    if (confirm('Are you sure you want to end the game?')) {
-                        endGame();
-                    }
+                return {
+                    fact: player.fact,
+                    correctAnswer: player.name,
+                    options: allOptions.map(p => p.name),
+                    correctIndex: allOptions.findIndex(p => p.id === player.id)
                 };
-            }
-            
-            function getOptionColor(index) {
-                const colors = [
-                    'from-red-500 to-red-600',
-                    'from-blue-500 to-blue-600', 
-                    'from-green-500 to-green-600',
-                    'from-yellow-500 to-yellow-600'
-                ];
-                return colors[index] || 'from-gray-500 to-gray-600';
-            }
-            
-            function startTeacherTimer() {
-                if (timerInterval) clearInterval(timerInterval);
-                
-                timerInterval = setInterval(async () => {
-                    timeLeft--;
-                    
-                    // Update timer display
-                    const timerEl = document.getElementById('teacher-timer');
-                    const nextBtn = document.getElementById('next-question-btn');
-                    
-                    if (timerEl) {
-                        timerEl.innerHTML = `⏰ ${timeLeft}`;
-                        if (timeLeft <= 5) {
-                            timerEl.className = 'w-24 h-24 rounded-full flex items-center justify-center text-3xl font-bold bg-red-500 text-white animate-pulse';
-                        }
-                    }
-                    
-                    if (nextBtn) {
-                        nextBtn.textContent = `Next Question (${timeLeft}s)`;
-                        if (timeLeft <= 0) {
-                            nextBtn.disabled = false;
-                            nextBtn.textContent = 'Show Results & Next Question';
-                            nextBtn.onclick = () => nextQuestion();
-                        }
-                    }
-                    
-                    // Update game state for students
-                    currentGame.timeLeft = timeLeft;
-                    await saveToFirebase(gameCode, currentGame);
-                    
-                    if (timeLeft <= 0) {
-                        clearInterval(timerInterval);
-                    }
-                }, 1000);
-            }
-            
-            async function nextQuestion() {
-                if (timerInterval) clearInterval(timerInterval);
-                
-                currentQuestion++;
-                
-                if (currentQuestion >= gameQuestions.length) {
-                    // Game finished
-                    endGame();
-                    return;
-                }
-                
-                // Setup next question
-                timeLeft = 15;
-                currentGame.currentQuestion = currentQuestion;
-                currentGame.timeLeft = timeLeft;
-                currentGame.questionData = gameQuestions[currentQuestion];
-                
-                await saveToFirebase(gameCode, currentGame);
-                
-                // Re-render teacher view
-                renderTeacherGameControl();
-            }
-            
-            async function endGame() {
-                if (timerInterval) clearInterval(timerInterval);
-                
-                currentGame.gamePhase = 'final';
-                await saveToFirebase(gameCode, currentGame);
-                
-                // Show teacher summary
-                app.innerHTML = `
-                    <div class="min-h-screen bg-gradient-to-br from-yellow-600 via-orange-600 to-red-600 flex items-center justify-center p-4">
-                        <div class="bg-white rounded-3xl shadow-2xl p-8 max-w-2xl w-full text-center">
-                            <div class="text-6xl mb-4">🎉</div>
-                            <h2 class="text-3xl font-bold text-gray-800 mb-4">Game Complete!</h2>
-                            <p class="text-lg text-gray-600 mb-6">Students can see their final scores on their devices.</p>
-                            <p class="text-sm text-gray-500 mb-6">Thanks for playing "Gotten to Know You!"</p>
-                            
-                            <button onclick="location.reload()" class="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-semibold py-4 px-8 rounded-2xl transition-all duration-300 transform hover:scale-105 shadow-lg">
-                                Start New Game
-                            </button>
-                        </div>
-                    </div>
-                `;
-            }
-            
-            // Make functions global
-            window.nextQuestion = nextQuestion;
-            window.endGame = endGame;
-            
-            function renderStudentGameView() {
-                if (!currentGame.questionData) {
-                    app.innerHTML = `
-                        <div class="min-h-screen bg-gradient-to-br from-green-600 via-teal-600 to-blue-600 flex items-center justify-center p-4">
-                            <div class="bg-white rounded-3xl shadow-2xl p-8 max-w-md w-full text-center">
-                                <div class="text-4xl mb-4">⏳</div>
-                                <h2 class="text-2xl font-bold text-gray-800 mb-4">Waiting for next question...</h2>
-                                <p class="text-gray-600">The teacher will show the question on the main screen</p>
-                            </div>
-                        </div>
-                    `;
-                    return;
-                }
-                
-                const question = currentGame.questionData;
-                const questionNum = (currentGame.currentQuestion || 0) + 1;
-                const totalQuestions = currentGame.players.length;
-                
-                app.innerHTML = `
-                    <div class="min-h-screen bg-gradient-to-br from-purple-600 via-pink-600 to-red-600 p-4">
-                        <div class="max-w-md mx-auto">
-                            <div class="bg-white rounded-3xl shadow-2xl p-6">
-                                <!-- Header -->
-                                <div class="text-center mb-6">
-                                    <div class="bg-gradient-to-r from-blue-500 to-purple-500 text-white px-4 py-2 rounded-2xl text-sm font-bold mb-4">
-                                        Question ${questionNum}/${totalQuestions}
-                                    </div>
-                                    <div class="text-lg font-bold text-gray-800">Look at the main screen for the question!</div>
-                                    <div class="text-sm text-gray-600 mt-2">Choose your answer below:</div>
-                                </div>
-                                
-                                <!-- Timer -->
-                                <div class="flex justify-center mb-6">
-                                    <div id="student-timer" class="w-16 h-16 rounded-full flex items-center justify-center text-xl font-bold ${currentGame.timeLeft <= 5 ? 'bg-red-500 animate-pulse' : 'bg-gradient-to-r from-green-400 to-blue-500'} text-white">
-                                        ${currentGame.timeLeft || 15}
-                                    </div>
-                                </div>
-                                
-                                <!-- Answer Buttons -->
-                                <div class="space-y-3" id="student-options">
-                                    ${question.options.map((option, index) => `
-                                        <button onclick="submitStudentAnswer(${index})" 
-                                                class="student-option w-full p-4 rounded-2xl font-semibold text-lg transition-all duration-300 transform hover:scale-105 ${getStudentOptionStyle(index)}"
-                                                ${currentGame.timeLeft <= 0 ? 'disabled' : ''}>
-                                            <span class="text-2xl font-bold mr-3">${String.fromCharCode(65 + index)}</span>
-                                            ${option}
-                                        </button>
-                                    `).join('')}
-                                </div>
-                                
-                                <!-- Score Display -->
-                                <div class="mt-6 text-center">
-                                    <div class="bg-gray-100 px-4 py-2 rounded-xl">
-                                        <span class="text-sm text-gray-600">Your Score: </span>
-                                        <span class="font-bold text-gray-800">${score}/${questionNum - 1}</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                `;
-            }
-            
-            function getStudentOptionStyle(index) {
-                const styles = [
-                    'bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white shadow-lg',
-                    'bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white shadow-lg',
-                    'bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white shadow-lg',
-                    'bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700 text-white shadow-lg'
-                ];
-                return styles[index] || 'bg-gray-500 text-white shadow-lg';
-            }
-            
-            function submitStudentAnswer(selectedIndex) {
-                const question = currentGame.questionData;
-                const buttons = document.querySelectorAll('.student-option');
-                
-                // Disable all buttons
-                buttons.forEach((btn, index) => {
-                    btn.disabled = true;
-                    btn.onclick = null;
-                    
-                    if (index === question.correctIndex) {
-                        btn.className = 'student-option w-full p-4 rounded-2xl font-semibold text-lg bg-green-500 text-white';
-                        btn.innerHTML += ' ✅';
-                    } else if (index === selectedIndex) {
-                        btn.className = 'student-option w-full p-4 rounded-2xl font-semibold text-lg bg-red-500 text-white';
-                        btn.innerHTML += ' ❌';
-                    } else {
-                        btn.className = 'student-option w-full p-4 rounded-2xl font-semibold text-lg bg-gray-300 text-gray-700';
-                    }
-                });
-                
-                // Update score
-                if (selectedIndex === question.correctIndex) {
-                    score++;
-                }
-                
-                // Show waiting for next question
-                setTimeout(() => {
-                    app.innerHTML = `
-                        <div class="min-h-screen bg-gradient-to-br from-green-600 via-teal-600 to-blue-600 flex items-center justify-center p-4">
-                            <div class="bg-white rounded-3xl shadow-2xl p-8 max-w-md w-full text-center">
-                                <div class="text-4xl mb-4">${selectedIndex === question.correctIndex ? '🎉' : '😅'}</div>
-                                <h2 class="text-2xl font-bold text-gray-800 mb-4">
-                                    ${selectedIndex === question.correctIndex ? 'Correct!' : 'Not quite!'}
-                                </h2>
-                                <p class="text-gray-600 mb-4">Your Score: ${score}/${(currentGame.currentQuestion || 0) + 1}</p>
-                                <p class="text-sm text-gray-500">Waiting for next question...</p>
-                            </div>
-                        </div>
-                    `;
-                }, 2000);
-            }
-            
-            // Make function global
-            window.submitStudentAnswer = submitStudentAnswer;
-            
-            function renderResults() {
-                const percentage = Math.round((score / gameQuestions.length) * 100);
-                
-                app.innerHTML = `
-                    <div class="min-h-screen bg-gradient-to-br from-yellow-600 via-orange-600 to-red-600 flex items-center justify-center p-4">
-                        <div class="bg-white rounded-3xl shadow-2xl p-8 max-w-md w-full text-center">
-                            <div class="mb-8">
-                                <div class="bg-gradient-to-r from-yellow-400 to-orange-500 rounded-full w-20 h-20 flex items-center justify-center mx-auto mb-4 text-4xl">
-                                    🏆
-                                </div>
-                                <h2 class="text-3xl font-bold text-gray-800 mb-2">Game Complete!</h2>
-                            </div>
-                            
-                            <div class="space-y-6">
-                                <div class="bg-gradient-to-r from-yellow-100 to-orange-100 p-6 rounded-2xl">
-                                    <h3 class="text-2xl font-bold text-gray-800 mb-2">Your Score</h3>
-                                    <div class="text-5xl font-bold text-orange-600 mb-2">${score}</div>
-                                    <div class="text-lg text-gray-600">out of ${gameQuestions.length} questions</div>
-                                    <div class="text-2xl font-semibold text-gray-800 mt-2">${percentage}%</div>
-                                </div>
-                                
-                                <div class="flex justify-center text-6xl">
-                                    ${percentage >= 80 ? '🏆' : percentage >= 60 ? '🥈' : percentage >= 40 ? '🥉' : '🎯'}
-                                </div>
-                                
-                                <p class="text-lg text-gray-600">
-                                    ${percentage >= 80 ? 'Amazing! You really know your classmates!' :
-                                      percentage >= 60 ? 'Great job! You know your classmates well.' :
-                                      percentage >= 40 ? 'Not bad! There\'s still more to learn.' :
-                                      'Time to get to know your classmates better!'}
-                                </p>
-                                
-                                <button onclick="playAgain()" class="w-full bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-semibold py-4 px-6 rounded-2xl transition-all duration-300 transform hover:scale-105 shadow-lg">
-                                    Play Again
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                `;
-            }
-            
-            function playAgain() {
-                gameState = 'menu';
-                renderMenu();
-            }
-            
-            // Make functions global so onclick can access them
-            window.selectAnswer = selectAnswer;
-            window.playAgain = playAgain;
-            
-            function generateGameCode() {
-                return Math.random().toString(36).substr(2, 6).toUpperCase();
-            }
-            
-            function saveToFirebase(code, data) {
-                console.log('Attempting to save to Firebase:', code, data);
-                return fetch(`${firebaseConfig.databaseURL}/games/${code}.json`, {
+            });
+        }
+        
+        async function saveToFirebase(code, data) {
+            console.log('Saving to Firebase:', code, data);
+            try {
+                const response = await fetch(`${firebaseConfig.databaseURL}/games/${code}.json`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(data)
-                }).then(response => {
-                    console.log('Firebase response status:', response.status);
-                    if (!response.ok) {
-                        throw new Error('Firebase failed with status: ' + response.status);
-                    }
-                    return response;
-                }).catch(err => {
-                    console.log('Firebase failed, using localStorage:', err);
-                    localStorage.setItem('game-' + code, JSON.stringify(data));
-                    return Promise.resolve();
                 });
+                
+                if (!response.ok) {
+                    throw new Error('Firebase failed with status: ' + response.status);
+                }
+                
+                console.log('Successfully saved to Firebase');
+                return true;
+            } catch (err) {
+                console.log('Firebase failed, using localStorage:', err);
+                localStorage.setItem('game-' + code, JSON.stringify(data));
+                return true;
             }
-            
-            function loadFromFirebase(code) {
-                return fetch(`${firebaseConfig.databaseURL}/games/${code}.json`)
-                    .then(response => response.json())
-                    .catch(err => {
-                        console.log('Firebase failed, trying localStorage');
-                        const saved = localStorage.getItem('game-' + code);
-                        return saved ? JSON.parse(saved) : null;
-                    });
+        }
+        
+        async function loadFromFirebase(code) {
+            try {
+                const response = await fetch(`${firebaseConfig.databaseURL}/games/${code}.json`);
+                const data = await response.json();
+                return data;
+            } catch (err) {
+                console.log('Firebase failed, trying localStorage');
+                const saved = localStorage.getItem('game-' + code);
+                return saved ? JSON.parse(saved) : null;
             }
-            
-            // Render functions
-            function renderMenu() {
-                app.innerHTML = `
-                    <div class="min-h-screen bg-gradient-to-br from-purple-600 via-pink-600 to-blue-600 flex items-center justify-center p-4">
-                        <div class="bg-white rounded-3xl shadow-2xl p-8 max-w-md w-full text-center">
-                            <div class="mb-8">
-                                <div class="bg-gradient-to-r from-purple-500 to-pink-500 rounded-full w-20 h-20 flex items-center justify-center mx-auto mb-4 text-4xl">
-                                    👥
-                                </div>
-                                <h1 class="text-3xl font-bold text-gray-800 mb-2">Gotten to Know You!</h1>
-                                <p class="text-gray-600">A fun classroom game to learn about each other</p>
+        }
+        
+        function showError(elementId, message) {
+            const errorEl = document.getElementById(elementId);
+            if (errorEl) {
+                errorEl.textContent = message;
+                errorEl.classList.remove('hidden');
+                setTimeout(() => errorEl.classList.add('hidden'), 5000);
+            } else {
+                alert(message);
+            }
+        }
+        
+        // Render functions
+        function renderMenu() {
+            console.log('Rendering menu');
+            const app = document.getElementById('app');
+            app.innerHTML = `
+                <div class="min-h-screen bg-gradient-to-br from-purple-600 via-pink-600 to-blue-600 flex items-center justify-center p-4 fade-in">
+                    <div class="bg-white rounded-3xl shadow-2xl p-8 max-w-md w-full text-center">
+                        <div class="mb-8">
+                            <div class="bg-gradient-to-r from-purple-500 to-pink-500 rounded-full w-20 h-20 flex items-center justify-center mx-auto mb-4 text-4xl">
+                                👥
                             </div>
-                            
-                            <div class="space-y-4">
-                                <button id="teacher-btn" class="w-full bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white font-semibold py-4 px-6 rounded-2xl transition-all duration-300 transform hover:scale-105 shadow-lg">
-                                    ▶️ I'm a Teacher
-                                </button>
-                                
-                                <button id="student-btn" class="w-full bg-gradient-to-r from-green-500 to-teal-500 hover:from-green-600 hover:to-teal-600 text-white font-semibold py-4 px-6 rounded-2xl transition-all duration-300 transform hover:scale-105 shadow-lg">
-                                    👤 I'm a Student
-                                </button>
-                            </div>
+                            <h1 class="text-3xl font-bold text-gray-800 mb-2">Gotten to Know You!</h1>
+                            <p class="text-gray-600">A fun classroom game to learn about each other</p>
                         </div>
-                    </div>
-                `;
-                
-                document.getElementById('teacher-btn').onclick = () => {
-                    gameState = 'teacher-setup';
-                    renderTeacherSetup();
-                };
-                
-                document.getElementById('student-btn').onclick = () => {
-                    gameState = 'student-join';
-                    renderStudentJoin();
-                };
-            }
-            
-            function renderTeacherSetup() {
-                app.innerHTML = `
-                    <div class="min-h-screen bg-gradient-to-br from-blue-600 via-purple-600 to-pink-600 flex items-center justify-center p-4">
-                        <div class="bg-white rounded-3xl shadow-2xl p-8 max-w-md w-full text-center">
-                            <h2 class="text-2xl font-bold text-gray-800 mb-6">Create New Game</h2>
-                            <p class="text-gray-600 mb-8">Click the button below to create a new game and get your game code!</p>
-                            
-                            <button id="create-btn" class="w-full bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white font-semibold py-4 px-6 rounded-2xl transition-all duration-300 transform hover:scale-105 shadow-lg mb-4">
-                                Create Game
+                        
+                        <div class="space-y-4">
+                            <button id="teacher-btn" class="w-full bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white font-semibold py-4 px-6 rounded-2xl transition-all duration-300 transform hover:scale-105 shadow-lg">
+                                🎓 I'm a Teacher
                             </button>
                             
-                            <button id="back-btn" class="w-full bg-gray-300 hover:bg-gray-400 text-gray-700 font-semibold py-3 px-6 rounded-2xl transition-all duration-300">
-                                Back to Menu
+                            <button id="student-btn" class="w-full bg-gradient-to-r from-green-500 to-teal-500 hover:from-green-600 hover:to-teal-600 text-white font-semibold py-4 px-6 rounded-2xl transition-all duration-300 transform hover:scale-105 shadow-lg">
+                                🎒 I'm a Student
                             </button>
                         </div>
+                        
+                        <div class="mt-6 text-xs text-gray-500">
+                            v2.0 - Enhanced Edition
+                        </div>
                     </div>
-                `;
+                </div>
+            `;
+            
+            document.getElementById('teacher-btn').addEventListener('click', () => {
+                gameState = 'teacher-setup';
+                renderTeacherSetup();
+            });
+            
+            document.getElementById('student-btn').addEventListener('click', () => {
+                gameState = 'student-join';
+                renderStudentJoin();
+            });
+        }
+        
+        function renderTeacherSetup() {
+            const app = document.getElementById('app');
+            app.innerHTML = `
+                <div class="min-h-screen bg-gradient-to-br from-blue-600 via-purple-600 to-pink-600 flex items-center justify-center p-4 fade-in">
+                    <div class="bg-white rounded-3xl shadow-2xl p-8 max-w-md w-full text-center">
+                        <h2 class="text-2xl font-bold text-gray-800 mb-6">Create New Game</h2>
+                        <p class="text-gray-600 mb-8">Click the button below to create a new game and get your game code!</p>
+                        
+                        <button id="create-btn" class="w-full bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white font-semibold py-4 px-6 rounded-2xl transition-all duration-300 transform hover:scale-105 shadow-lg mb-4">
+                            🎮 Create Game
+                        </button>
+                        
+                        <button id="back-btn" class="w-full bg-gray-300 hover:bg-gray-400 text-gray-700 font-semibold py-3 px-6 rounded-2xl transition-all duration-300">
+                            ← Back to Menu
+                        </button>
+                        
+                        <div id="setup-error" class="hidden mt-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-2xl"></div>
+                    </div>
+                </div>
+            `;
+            
+            document.getElementById('create-btn').addEventListener('click', async () => {
+                const btn = document.getElementById('create-btn');
+                btn.disabled = true;
+                btn.textContent = 'Creating...';
                 
-                document.getElementById('create-btn').onclick = async () => {
-                    console.log('Create button clicked'); // Debug log
+                try {
+                    gameCode = generateGameCode();
+                    console.log('Generated game code:', gameCode);
                     
-                    try {
-                        gameCode = generateGameCode();
-                        console.log('Generated code:', gameCode); // Debug log
-                        
-                        currentGame = {
-                            code: gameCode,
-                            players: [],
-                            isStarted: false,
-                            createdAt: new Date().toISOString()
-                        };
-                        
-                        console.log('Saving to Firebase...'); // Debug log
-                        await saveToFirebase(gameCode, currentGame);
-                        console.log('Saved successfully'); // Debug log
-                        
-                        gameState = 'teacher-dashboard';
-                        renderTeacherDashboard();
-                    } catch (error) {
-                        console.error('Error creating game:', error);
-                        alert('Error creating game: ' + error.message);
-                    }
-                };
-                
-                document.getElementById('back-btn').onclick = () => {
-                    gameState = 'menu';
-                    renderMenu();
-                };
-            }
+                    currentGame = {
+                        code: gameCode,
+                        players: [],
+                        isStarted: false,
+                        gamePhase: 'waiting',
+                        createdAt: new Date().toISOString()
+                    };
+                    
+                    await saveToFirebase(gameCode, currentGame);
+                    console.log('Game created successfully');
+                    
+                    gameState = 'teacher-dashboard';
+                    renderTeacherDashboard();
+                } catch (error) {
+                    console.error('Error creating game:', error);
+                    showError('setup-error', 'Error creating game. Please try again.');
+                    btn.disabled = false;
+                    btn.textContent = '🎮 Create Game';
+                }
+            });
             
-            function renderTeacherDashboard() {
-                app.innerHTML = `
-                    <div class="min-h-screen bg-gradient-to-br from-blue-600 via-purple-600 to-pink-600 p-4">
-                        <div class="max-w-4xl mx-auto">
-                            <div class="bg-white rounded-3xl shadow-2xl p-8">
-                                <div class="text-center mb-8">
-                                    <h2 class="text-3xl font-bold text-gray-800 mb-2">Teacher Dashboard</h2>
-                                    <div class="bg-gradient-to-r from-yellow-400 to-orange-500 text-white px-6 py-3 rounded-2xl inline-block text-xl font-bold">
-                                        Game Code: ${gameCode}
-                                    </div>
-                                    
-                                    <div class="mt-4 bg-blue-100 border border-blue-400 text-blue-800 px-4 py-3 rounded-2xl">
-                                        <strong>📱 Students join at: ${window.location.host}</strong>
-                                        <br />
-                                        <div class="mt-2">
-                                            <button id="copy-instructions" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg font-semibold mr-2">
-                                                📋 Copy Instructions
-                                            </button>
-                                            <button id="show-qr" class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg font-semibold">
-                                                📱 Show QR Info
-                                            </button>
-                                        </div>
-                                        <div id="qr-section" class="mt-4 hidden">
-                                            <div class="bg-white p-4 rounded border">
-                                                <p class="text-sm text-gray-700 mb-2">🔗 Share this link:</p>
-                                                <div class="bg-gray-100 p-2 rounded text-xs break-all">${window.location.href}?game=${btoa(JSON.stringify(currentGame))}</div>
-                                                <button id="copy-link" class="mt-2 bg-purple-500 text-white px-3 py-1 rounded text-sm">Copy Link</button>
-                                            </div>
-                                        </div>
-                                    </div>
+            document.getElementById('back-btn').addEventListener('click', () => {
+                gameState = 'menu';
+                renderMenu();
+            });
+        }
+        
+        function renderTeacherDashboard() {
+            const app = document.getElementById('app');
+            app.innerHTML = `
+                <div class="min-h-screen bg-gradient-to-br from-blue-600 via-purple-600 to-pink-600 p-4 fade-in">
+                    <div class="max-w-4xl mx-auto">
+                        <div class="bg-white rounded-3xl shadow-2xl p-8">
+                            <div class="text-center mb-8">
+                                <h2 class="text-3xl font-bold text-gray-800 mb-4">Teacher Dashboard</h2>
+                                <div class="bg-gradient-to-r from-yellow-400 to-orange-500 text-white px-6 py-3 rounded-2xl inline-block text-xl font-bold">
+                                    Game Code: ${gameCode}
                                 </div>
                                 
-                                <div class="mb-8">
-                                    <h3 class="text-xl font-semibold text-gray-700 mb-4">Players (<span id="player-count">0</span>)</h3>
-                                    <div id="players-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
-                                </div>
-                                
-                                <div class="text-center space-y-4">
-                                    <button id="start-game" class="bg-gradient-to-r from-green-500 to-teal-500 hover:from-green-600 hover:to-teal-600 text-white font-semibold py-4 px-8 rounded-2xl transition-all duration-300 transform hover:scale-105 shadow-lg" disabled>
-                                        Start Game (Need 2+ Players)
-                                    </button>
-                                    
-                                    <br>
-                                    <button id="back-menu" class="bg-gray-300 hover:bg-gray-400 text-gray-700 font-semibold py-3 px-6 rounded-2xl transition-all duration-300">
-                                        Back to Menu
-                                    </button>
+                                <div class="mt-6 bg-blue-100 border border-blue-400 text-blue-800 px-4 py-3 rounded-2xl">
+                                    <strong>📱 Students join at: ${window.location.host}</strong>
+                                    <br />
+                                    <div class="mt-3 space-x-2">
+                                        <button id="copy-instructions" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg font-semibold">
+                                            📋 Copy Instructions
+                                        </button>
+                                        <button id="copy-link" class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg font-semibold">
+                                            🔗 Copy Game Link
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                    </div>
-                `;
-                
-                // Event listeners
-                document.getElementById('copy-instructions').onclick = () => {
-                    const message = `🎮 Join our class game!\n\n1. Go to: ${window.location.host}\n2. Click "I'm a Student"\n3. Enter code: ${gameCode}`;
-                    navigator.clipboard.writeText(message);
-                    alert('✅ Instructions copied!');
-                };
-                
-                document.getElementById('show-qr').onclick = () => {
-                    const qrSection = document.getElementById('qr-section');
-                    qrSection.classList.toggle('hidden');
-                };
-                
-                document.getElementById('copy-link').onclick = () => {
-                    const link = `${window.location.href}?game=${btoa(JSON.stringify(currentGame))}`;
-                    navigator.clipboard.writeText(link);
-                    alert('✅ Link copied!');
-                };
-                
-                document.getElementById('back-menu').onclick = () => {
-                    gameState = 'menu';
-                    renderMenu();
-                };
-                
-                // Poll for players
-                pollForPlayers();
-            }
-            
-            function renderStudentJoin() {
-                app.innerHTML = `
-                    <div class="min-h-screen bg-gradient-to-br from-green-600 via-teal-600 to-blue-600 flex items-center justify-center p-4">
-                        <div class="bg-white rounded-3xl shadow-2xl p-8 max-w-md w-full text-center">
-                            <h2 class="text-2xl font-bold text-gray-800 mb-6">Join Game</h2>
                             
-                            <div class="space-y-6">
-                                <div>
-                                    <label class="block text-sm font-medium text-gray-700 mb-2">Game Code</label>
-                                    <input type="text" id="game-code-input" placeholder="Enter game code" class="w-full px-4 py-3 border-2 border-gray-300 rounded-2xl focus:border-blue-500 focus:outline-none text-center text-lg font-semibold" maxlength="6">
+                            <div class="mb-8">
+                                <h3 class="text-xl font-semibold text-gray-700 mb-4">Players (<span id="player-count">0</span>)</h3>
+                                <div id="players-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                    <div class="bg-gray-100 p-4 rounded-2xl text-center text-gray-500">
+                                        Waiting for players to join...
+                                    </div>
                                 </div>
-                                
-                                <button id="join-btn" class="w-full bg-gradient-to-r from-green-500 to-teal-500 hover:from-green-600 hover:to-teal-600 text-white font-semibold py-4 px-6 rounded-2xl transition-all duration-300 transform hover:scale-105 shadow-lg">
-                                    Join Game
+                            </div>
+                            
+                            <div class="text-center space-y-4">
+                                <button id="start-game" class="bg-gradient-to-r from-green-500 to-teal-500 hover:from-green-600 hover:to-teal-600 text-white font-semibold py-4 px-8 rounded-2xl transition-all duration-300 transform hover:scale-105 shadow-lg" disabled>
+                                    🚀 Start Game (Need 2+ Players)
                                 </button>
                                 
-                                <div id="error-msg" class="hidden bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-2xl"></div>
+                                <br>
+                                <button id="back-menu" class="bg-gray-300 hover:bg-gray-400 text-gray-700 font-semibold py-3 px-6 rounded-2xl transition-all duration-300">
+                                    ← Back to Menu
+                                </button>
                             </div>
-                            
-                            <button id="back-btn2" class="w-full bg-gray-300 hover:bg-gray-400 text-gray-700 font-semibold py-3 px-6 rounded-2xl transition-all duration-300 mt-4">
-                                Back to Menu
-                            </button>
                         </div>
                     </div>
-                `;
+                </div>
+            `;
+            
+            // Set up event listeners
+            document.getElementById('copy-instructions').addEventListener('click', () => {
+                const message = `🎮 Join our class game!\n\n1. Go to: ${window.location.host}\n2. Click "I'm a Student"\n3. Enter code: ${gameCode}`;
+                navigator.clipboard.writeText(message).then(() => {
+                    alert('✅ Instructions copied to clipboard!');
+                });
+            });
+            
+            document.getElementById('copy-link').addEventListener('click', () => {
+                const link = `${window.location.href}?code=${gameCode}`;
+                navigator.clipboard.writeText(link).then(() => {
+                    alert('✅ Game link copied to clipboard!');
+                });
+            });
+            
+            document.getElementById('back-menu').addEventListener('click', () => {
+                stopPolling();
+                gameState = 'menu';
+                renderMenu();
+            });
+            
+            // Start polling for players
+            startPolling();
+        }
+        
+        function renderStudentJoin() {
+            const app = document.getElementById('app');
+            app.innerHTML = `
+                <div class="min-h-screen bg-gradient-to-br from-green-600 via-teal-600 to-blue-600 flex items-center justify-center p-4 fade-in">
+                    <div class="bg-white rounded-3xl shadow-2xl p-8 max-w-md w-full text-center">
+                        <h2 class="text-2xl font-bold text-gray-800 mb-6">Join Game</h2>
+                        
+                        <div class="space-y-6">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Game Code</label>
+                                <input type="text" id="game-code-input" placeholder="Enter game code" class="w-full px-4 py-3 border-2 border-gray-300 rounded-2xl focus:border-blue-500 focus:outline-none text-center text-lg font-semibold uppercase" maxlength="6">
+                            </div>
+                            
+                            <button id="join-btn" class="w-full bg-gradient-to-r from-green-500 to-teal-500 hover:from-green-600 hover:to-teal-600 text-white font-semibold py-4 px-6 rounded-2xl transition-all duration-300 transform hover:scale-105 shadow-lg">
+                                🎯 Join Game
+                            </button>
+                            
+                            <div id="join-error" class="hidden bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-2xl"></div>
+                        </div>
+                        
+                        <button id="back-btn2" class="w-full bg-gray-300 hover:bg-gray-400 text-gray-700 font-semibold py-3 px-6 rounded-2xl transition-all duration-300 mt-4">
+                            ← Back to Menu
+                        </button>
+                    </div>
+                </div>
+            `;
+            
+            // Auto-uppercase input
+            document.getElementById('game-code-input').addEventListener('input', (e) => {
+                e.target.value = e.target.value.toUpperCase();
+            });
+            
+            document.getElementById('join-btn').addEventListener('click', async () => {
+                const code = document.getElementById('game-code-input').value.toUpperCase().trim();
+                if (!code) {
+                    showError('join-error', 'Please enter a game code');
+                    return;
+                }
                 
-                document.getElementById('join-btn').onclick = async () => {
-                    const code = document.getElementById('game-code-input').value.toUpperCase();
-                    if (!code) {
-                        showError('Please enter a game code');
+                const btn = document.getElementById('join-btn');
+                btn.disabled = true;
+                btn.textContent = 'Joining...';
+                
+                try {
+                    const game = await loadFromFirebase(code);
+                    if (!game) {
+                        showError('join-error', 'Game not found! Please check the code.');
+                        btn.disabled = false;
+                        btn.textContent = '🎯 Join Game';
                         return;
                     }
                     
-                    const game = await loadFromFirebase(code);
-                    if (!game) {
-                        showError('Game not found! Please check the code.');
+                    if (game.isStarted) {
+                        showError('join-error', 'This game has already started!');
+                        btn.disabled = false;
+                        btn.textContent = '🎯 Join Game';
                         return;
                     }
                     
@@ -655,52 +378,73 @@
                     currentGame = game;
                     gameState = 'student-submit';
                     renderStudentSubmit();
-                };
-                
-                document.getElementById('back-btn2').onclick = () => {
-                    gameState = 'menu';
-                    renderMenu();
-                };
-            }
+                } catch (error) {
+                    console.error('Error joining game:', error);
+                    showError('join-error', 'Error joining game. Please try again.');
+                    btn.disabled = false;
+                    btn.textContent = '🎯 Join Game';
+                }
+            });
             
-            function renderStudentSubmit() {
-                app.innerHTML = `
-                    <div class="min-h-screen bg-gradient-to-br from-green-600 via-teal-600 to-blue-600 flex items-center justify-center p-4">
-                        <div class="bg-white rounded-3xl shadow-2xl p-8 max-w-md w-full">
-                            <h2 class="text-2xl font-bold text-gray-800 mb-6 text-center">Submit Your Info</h2>
-                            
-                            <div class="space-y-6">
-                                <div>
-                                    <label class="block text-sm font-medium text-gray-700 mb-2">Your Name</label>
-                                    <input type="text" id="player-name" placeholder="Enter your name" class="w-full px-4 py-3 border-2 border-gray-300 rounded-2xl focus:border-blue-500 focus:outline-none" maxlength="30">
-                                </div>
-                                
-                                <div>
-                                    <label class="block text-sm font-medium text-gray-700 mb-2">Fun Fact About You</label>
-                                    <textarea id="player-fact" placeholder="Share something interesting about yourself..." class="w-full px-4 py-3 border-2 border-gray-300 rounded-2xl focus:border-blue-500 focus:outline-none resize-none h-24" maxlength="150"></textarea>
-                                    <p class="text-sm text-gray-500 mt-1"><span id="char-count">0</span>/150</p>
-                                </div>
-                                
-                                <button id="submit-btn" class="w-full bg-gradient-to-r from-green-500 to-teal-500 hover:from-green-600 hover:to-teal-600 text-white font-semibold py-4 px-6 rounded-2xl transition-all duration-300 transform hover:scale-105 shadow-lg">
-                                    Submit
-                                </button>
-                                
-                                <div id="error-msg2" class="hidden bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-2xl"></div>
+            document.getElementById('back-btn2').addEventListener('click', () => {
+                gameState = 'menu';
+                renderMenu();
+            });
+        }
+        
+        function renderStudentSubmit() {
+            const app = document.getElementById('app');
+            app.innerHTML = `
+                <div class="min-h-screen bg-gradient-to-br from-green-600 via-teal-600 to-blue-600 flex items-center justify-center p-4 fade-in">
+                    <div class="bg-white rounded-3xl shadow-2xl p-8 max-w-md w-full">
+                        <h2 class="text-2xl font-bold text-gray-800 mb-6 text-center">Submit Your Info</h2>
+                        
+                        <div class="space-y-6">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Your Name</label>
+                                <input type="text" id="player-name" placeholder="Enter your name" class="w-full px-4 py-3 border-2 border-gray-300 rounded-2xl focus:border-blue-500 focus:outline-none" maxlength="30">
                             </div>
+                            
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Fun Fact About You</label>
+                                <textarea id="player-fact" placeholder="Share something interesting about yourself..." class="w-full px-4 py-3 border-2 border-gray-300 rounded-2xl focus:border-blue-500 focus:outline-none resize-none h-24" maxlength="150"></textarea>
+                                <p class="text-sm text-gray-500 mt-1"><span id="char-count">0</span>/150 characters</p>
+                            </div>
+                            
+                            <button id="submit-btn" class="w-full bg-gradient-to-r from-green-500 to-teal-500 hover:from-green-600 hover:to-teal-600 text-white font-semibold py-4 px-6 rounded-2xl transition-all duration-300 transform hover:scale-105 shadow-lg">
+                                ✅ Submit
+                            </button>
+                            
+                            <div id="submit-error" class="hidden bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-2xl"></div>
                         </div>
                     </div>
-                `;
+                </div>
+            `;
+            
+            document.getElementById('player-fact').addEventListener('input', (e) => {
+                document.getElementById('char-count').textContent = e.target.value.length;
+            });
+            
+            document.getElementById('submit-btn').addEventListener('click', async () => {
+                const name = document.getElementById('player-name').value.trim();
+                const fact = document.getElementById('player-fact').value.trim();
                 
-                document.getElementById('player-fact').oninput = (e) => {
-                    document.getElementById('char-count').textContent = e.target.value.length;
-                };
+                if (!name || !fact) {
+                    showError('submit-error', 'Please fill in both your name and fact!');
+                    return;
+                }
                 
-                document.getElementById('submit-btn').onclick = async () => {
-                    const name = document.getElementById('player-name').value.trim();
-                    const fact = document.getElementById('player-fact').value.trim();
-                    
-                    if (!name || !fact) {
-                        showError2('Please fill in both your name and fact!');
+                const btn = document.getElementById('submit-btn');
+                btn.disabled = true;
+                btn.textContent = 'Submitting...';
+                
+                try {
+                    // Check if name already exists
+                    const existingPlayer = currentGame.players.find(p => p.name.toLowerCase() === name.toLowerCase());
+                    if (existingPlayer) {
+                        showError('submit-error', 'Someone with that name has already joined!');
+                        btn.disabled = false;
+                        btn.textContent = '✅ Submit';
                         return;
                     }
                     
@@ -709,181 +453,527 @@
                     currentGame.players.push({
                         id: Date.now(),
                         name: name,
-                        fact: fact
+                        fact: fact,
+                        joinedAt: new Date().toISOString()
                     });
                     
                     await saveToFirebase(gameCode, currentGame);
                     
-                    // Show success and wait for game to start
-                    gameState = 'student-waiting';
                     playerName = name;
-                    app.innerHTML = `
-                        <div class="min-h-screen bg-gradient-to-br from-green-600 via-teal-600 to-blue-600 flex items-center justify-center p-4">
-                            <div class="bg-white rounded-3xl shadow-2xl p-8 max-w-md w-full text-center">
-                                <div class="text-6xl mb-4">✅</div>
-                                <h2 class="text-2xl font-bold text-gray-800 mb-4">Successfully Joined!</h2>
-                                <p class="text-gray-600 mb-4">Hi ${name}! Waiting for the teacher to start the game...</p>
-                                <p class="text-sm text-gray-500">Game will start automatically when teacher begins</p>
-                                <div class="mt-4 text-sm text-gray-400">Players joined: ${currentGame.players.length}</div>
-                            </div>
+                    gameState = 'student-waiting';
+                    renderStudentWaiting();
+                } catch (error) {
+                    console.error('Error submitting info:', error);
+                    showError('submit-error', 'Error submitting info. Please try again.');
+                    btn.disabled = false;
+                    btn.textContent = '✅ Submit';
+                }
+            });
+        }
+        
+        function renderStudentWaiting() {
+            const app = document.getElementById('app');
+            app.innerHTML = `
+                <div class="min-h-screen bg-gradient-to-br from-green-600 via-teal-600 to-blue-600 flex items-center justify-center p-4 fade-in">
+                    <div class="bg-white rounded-3xl shadow-2xl p-8 max-w-md w-full text-center">
+                        <div class="text-6xl mb-4 animate-bounce">✅</div>
+                        <h2 class="text-2xl font-bold text-gray-800 mb-4">Successfully Joined!</h2>
+                        <p class="text-gray-600 mb-4">Hi ${playerName}! Waiting for the teacher to start the game...</p>
+                        <p class="text-sm text-gray-500 mb-4">Game will start automatically when the teacher begins</p>
+                        <div class="bg-gray-100 px-4 py-2 rounded-xl">
+                            <span class="text-sm text-gray-600">Players joined: </span>
+                            <span id="waiting-count" class="font-bold text-gray-800">${currentGame.players.length}</span>
                         </div>
-                    `;
-                };
-            }
+                    </div>
+                </div>
+            `;
             
-            function pollForPlayers() {
-                setInterval(async () => {
-                    if (gameState === 'teacher-dashboard' && gameCode) {
-                        const game = await loadFromFirebase(gameCode);
-                        if (game && game.players) {
-                            currentGame = game;
-                            updatePlayersList(game.players);
+            startPolling();
+        }
+        
+        // Polling functions
+        function startPolling() {
+            if (pollInterval) clearInterval(pollInterval);
+            
+            pollInterval = setInterval(async () => {
+                if (!gameCode) return;
+                
+                try {
+                    const game = await loadFromFirebase(gameCode);
+                    if (!game) return;
+                    
+                    currentGame = game;
+                    
+                    if (gameState === 'teacher-dashboard') {
+                        updatePlayersList(game.players);
+                    } else if (gameState === 'student-waiting') {
+                        // Update player count
+                        const countEl = document.getElementById('waiting-count');
+                        if (countEl) {
+                            countEl.textContent = game.players.length;
                         }
-                    } else if (gameState === 'student-waiting' && gameCode) {
-                        const game = await loadFromFirebase(gameCode);
-                        if (game && game.isStarted) {
-                            currentGame = game;
+                        
+                        // Check if game started
+                        if (game.isStarted) {
                             gameState = 'student-playing';
-                            score = 0; // Reset student score
+                            score = 0;
                             renderStudentGameView();
                         }
-                    } else if (gameState === 'student-playing' && gameCode) {
-                        const game = await loadFromFirebase(gameCode);
-                        if (game) {
-                            currentGame = game;
-                            if (game.gamePhase === 'final') {
-                                // Show final results
-                                renderStudentFinalResults();
-                            } else {
-                                // Update game view
-                                renderStudentGameView();
-                            }
+                    } else if (gameState === 'student-playing') {
+                        if (game.gamePhase === 'final') {
+                            renderStudentFinalResults();
+                        } else {
+                            renderStudentGameView();
                         }
                     }
-                }, 1000); // Poll every second for students
+                } catch (error) {
+                    console.error('Polling error:', error);
+                }
+            }, 2000); // Poll every 2 seconds
+        }
+        
+        function stopPolling() {
+            if (pollInterval) {
+                clearInterval(pollInterval);
+                pollInterval = null;
+            }
+        }
+        
+        function updatePlayersList(players) {
+            const playersList = document.getElementById('players-list');
+            const playerCount = document.getElementById('player-count');
+            const startBtn = document.getElementById('start-game');
+            
+            if (!playersList || !playerCount || !startBtn) return;
+            
+            playerCount.textContent = players.length;
+            
+            if (players.length === 0) {
+                playersList.innerHTML = `
+                    <div class="bg-gray-100 p-4 rounded-2xl text-center text-gray-500">
+                        Waiting for players to join...
+                    </div>
+                `;
+            } else {
+                playersList.innerHTML = players.map(player => `
+                    <div class="bg-gradient-to-r from-green-100 to-blue-100 p-4 rounded-2xl border-2 border-green-200">
+                        <div class="flex items-center">
+                            <span class="mr-3 text-xl">✅</span>
+                            <div class="text-left">
+                                <p class="font-semibold text-gray-800">${player.name}</p>
+                                <p class="text-sm text-gray-600">Fact submitted</p>
+                            </div>
+                        </div>
+                    </div>
+                `).join('');
             }
             
-            function renderStudentFinalResults() {
-                const totalQuestions = currentGame.players.length;
-                const percentage = Math.round((score / totalQuestions) * 100);
+            if (players.length >= 2) {
+                startBtn.disabled = false;
+                startBtn.textContent = '🚀 Start Game!';
+                startBtn.onclick = async () => {
+                    await startGame();
+                };
+            } else {
+                startBtn.disabled = true;
+                startBtn.textContent = `🚀 Start Game (Need ${2 - players.length} more players)`;
+            }
+        }
+        
+        async function startGame() {
+            try {
+                gameQuestions = generateQuestions(currentGame.players);
+                currentQuestion = 0;
+                timeLeft = 15;
                 
-                app.innerHTML = `
-                    <div class="min-h-screen bg-gradient-to-br from-yellow-600 via-orange-600 to-red-600 flex items-center justify-center p-4">
-                        <div class="bg-white rounded-3xl shadow-2xl p-8 max-w-md w-full text-center">
-                            <div class="mb-8">
-                                <div class="bg-gradient-to-r from-yellow-400 to-orange-500 rounded-full w-20 h-20 flex items-center justify-center mx-auto mb-4 text-4xl">
-                                    🏆
+                currentGame.isStarted = true;
+                currentGame.currentQuestion = currentQuestion;
+                currentGame.gamePhase = 'question';
+                currentGame.timeLeft = timeLeft;
+                currentGame.questionData = gameQuestions[currentQuestion];
+                
+                await saveToFirebase(gameCode, currentGame);
+                
+                gameState = 'teacher-game-control';
+                renderTeacherGameControl();
+            } catch (error) {
+                console.error('Error starting game:', error);
+                alert('Error starting game. Please try again.');
+            }
+        }
+        
+        function renderTeacherGameControl() {
+            const question = gameQuestions[currentQuestion];
+            const app = document.getElementById('app');
+            
+            app.innerHTML = `
+                <div class="min-h-screen bg-gradient-to-br from-purple-600 via-pink-600 to-red-600 p-4 fade-in">
+                    <div class="max-w-6xl mx-auto">
+                        <div class="bg-white rounded-3xl shadow-2xl p-8">
+                            <!-- Header -->
+                            <div class="text-center mb-8">
+                                <div class="flex justify-between items-center mb-4">
+                                    <div class="bg-gradient-to-r from-blue-500 to-purple-500 text-white px-6 py-3 rounded-2xl text-lg font-bold">
+                                        Question ${currentQuestion + 1}/${gameQuestions.length}
+                                    </div>
+                                    <div class="bg-gradient-to-r from-yellow-400 to-orange-500 text-white px-6 py-3 rounded-2xl text-lg font-bold">
+                                        Game Code: ${gameCode}
+                                    </div>
                                 </div>
-                                <h2 class="text-3xl font-bold text-gray-800 mb-2">Game Complete!</h2>
+                                
+                                <div class="flex justify-center mb-6">
+                                    <div id="teacher-timer" class="w-24 h-24 rounded-full flex items-center justify-center text-3xl font-bold bg-gradient-to-r from-green-400 to-blue-500 text-white">
+                                        ⏰ ${timeLeft}
+                                    </div>
+                                </div>
                             </div>
                             
-                            <div class="space-y-6">
-                                <div class="bg-gradient-to-r from-yellow-100 to-orange-100 p-6 rounded-2xl">
-                                    <h3 class="text-2xl font-bold text-gray-800 mb-2">Your Score</h3>
-                                    <div class="text-5xl font-bold text-orange-600 mb-2">${score}</div>
-                                    <div class="text-lg text-gray-600">out of ${totalQuestions} questions</div>
-                                    <div class="text-2xl font-semibold text-gray-800 mt-2">${percentage}%</div>
+                            <!-- Main Question Display -->
+                            <div class="mb-8">
+                                <h2 class="text-4xl font-bold text-center text-gray-800 mb-6">Guess who wrote this...</h2>
+                                <div class="bg-gradient-to-r from-blue-100 to-purple-100 p-8 rounded-3xl border-4 border-blue-200 text-center">
+                                    <p class="text-3xl text-gray-800 italic font-medium">"${question.fact}"</p>
+                                </div>
+                            </div>
+                            
+                            <!-- Answer Options for Display -->
+                            <div class="grid grid-cols-2 gap-6 mb-8">
+                                ${question.options.map((option, index) => `
+                                    <div class="bg-gradient-to-r ${getOptionColor(index)} p-6 rounded-2xl text-center">
+                                        <div class="text-2xl font-bold text-white mb-2">${String.fromCharCode(65 + index)}</div>
+                                        <div class="text-xl font-semibold text-white">${option}</div>
+                                    </div>
+                                `).join('')}
+                            </div>
+                            
+                            <!-- Teacher Controls -->
+                            <div class="text-center space-y-4">
+                                <div class="bg-gray-100 p-4 rounded-2xl">
+                                    <p class="text-lg font-semibold text-gray-700">Students are answering on their devices...</p>
+                                    <p class="text-sm text-gray-600">Timer will advance automatically</p>
                                 </div>
                                 
-                                <div class="flex justify-center text-6xl">
-                                    ${percentage >= 80 ? '🏆' : percentage >= 60 ? '🥈' : percentage >= 40 ? '🥉' : '🎯'}
+                                <button id="next-question-btn" class="bg-gradient-to-r from-green-500 to-teal-500 hover:from-green-600 hover:to-teal-600 text-white font-semibold py-3 px-8 rounded-2xl transition-all duration-300 disabled:opacity-50" disabled>
+                                    Next Question (${timeLeft}s)
+                                </button>
+                                
+                                <button id="end-game-btn" class="block mx-auto bg-red-500 hover:bg-red-600 text-white font-semibold py-2 px-6 rounded-2xl transition-all duration-300">
+                                    End Game
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            // Start timer
+            startTeacherTimer();
+            
+            document.getElementById('end-game-btn').addEventListener('click', () => {
+                if (confirm('Are you sure you want to end the game?')) {
+                    endGame();
+                }
+            });
+        }
+        
+        function getOptionColor(index) {
+            const colors = [
+                'from-red-500 to-red-600',
+                'from-blue-500 to-blue-600', 
+                'from-green-500 to-green-600',
+                'from-yellow-500 to-yellow-600'
+            ];
+            return colors[index] || 'from-gray-500 to-gray-600';
+        }
+        
+        function startTeacherTimer() {
+            if (timerInterval) clearInterval(timerInterval);
+            
+            timerInterval = setInterval(async () => {
+                timeLeft--;
+                
+                // Update timer display
+                const timerEl = document.getElementById('teacher-timer');
+                const nextBtn = document.getElementById('next-question-btn');
+                
+                if (timerEl) {
+                    timerEl.innerHTML = `⏰ ${timeLeft}`;
+                    if (timeLeft <= 5) {
+                        timerEl.className = 'w-24 h-24 rounded-full flex items-center justify-center text-3xl font-bold bg-red-500 text-white animate-pulse';
+                    }
+                }
+                
+                if (nextBtn) {
+                    nextBtn.textContent = `Next Question (${timeLeft}s)`;
+                    if (timeLeft <= 0) {
+                        nextBtn.disabled = false;
+                        nextBtn.textContent = 'Show Results & Next Question';
+                        nextBtn.onclick = () => nextQuestion();
+                    }
+                }
+                
+                // Update game state for students
+                currentGame.timeLeft = timeLeft;
+                await saveToFirebase(gameCode, currentGame);
+                
+                if (timeLeft <= 0) {
+                    clearInterval(timerInterval);
+                }
+            }, 1000);
+        }
+        
+        async function nextQuestion() {
+            if (timerInterval) clearInterval(timerInterval);
+            
+            currentQuestion++;
+            
+            if (currentQuestion >= gameQuestions.length) {
+                // Game finished
+                endGame();
+                return;
+            }
+            
+            // Setup next question
+            timeLeft = 15;
+            currentGame.currentQuestion = currentQuestion;
+            currentGame.timeLeft = timeLeft;
+            currentGame.questionData = gameQuestions[currentQuestion];
+            
+            await saveToFirebase(gameCode, currentGame);
+            
+            // Re-render teacher view
+            renderTeacherGameControl();
+        }
+        
+        async function endGame() {
+            if (timerInterval) clearInterval(timerInterval);
+            
+            currentGame.gamePhase = 'final';
+            await saveToFirebase(gameCode, currentGame);
+            
+            // Show teacher summary
+            const app = document.getElementById('app');
+            app.innerHTML = `
+                <div class="min-h-screen bg-gradient-to-br from-yellow-600 via-orange-600 to-red-600 flex items-center justify-center p-4 fade-in">
+                    <div class="bg-white rounded-3xl shadow-2xl p-8 max-w-2xl w-full text-center">
+                        <div class="text-6xl mb-4">🎉</div>
+                        <h2 class="text-3xl font-bold text-gray-800 mb-4">Game Complete!</h2>
+                        <p class="text-lg text-gray-600 mb-6">Students can see their final scores on their devices.</p>
+                        <p class="text-sm text-gray-500 mb-6">Thanks for playing "Gotten to Know You!"</p>
+                        
+                        <button onclick="location.reload()" class="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-semibold py-4 px-8 rounded-2xl transition-all duration-300 transform hover:scale-105 shadow-lg">
+                            Start New Game
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+        
+        function renderStudentGameView() {
+            if (!currentGame.questionData) {
+                const app = document.getElementById('app');
+                app.innerHTML = `
+                    <div class="min-h-screen bg-gradient-to-br from-green-600 via-teal-600 to-blue-600 flex items-center justify-center p-4 fade-in">
+                        <div class="bg-white rounded-3xl shadow-2xl p-8 max-w-md w-full text-center">
+                            <div class="text-4xl mb-4 animate-bounce">⏳</div>
+                            <h2 class="text-2xl font-bold text-gray-800 mb-4">Waiting for next question...</h2>
+                            <p class="text-gray-600">The teacher will show the question on the main screen</p>
+                        </div>
+                    </div>
+                `;
+                return;
+            }
+            
+            const question = currentGame.questionData;
+            const questionNum = (currentGame.currentQuestion || 0) + 1;
+            const totalQuestions = currentGame.players.length;
+            const app = document.getElementById('app');
+            
+            app.innerHTML = `
+                <div class="min-h-screen bg-gradient-to-br from-purple-600 via-pink-600 to-red-600 p-4 fade-in">
+                    <div class="max-w-md mx-auto">
+                        <div class="bg-white rounded-3xl shadow-2xl p-6">
+                            <!-- Header -->
+                            <div class="text-center mb-6">
+                                <div class="bg-gradient-to-r from-blue-500 to-purple-500 text-white px-4 py-2 rounded-2xl text-sm font-bold mb-4">
+                                    Question ${questionNum}/${totalQuestions}
                                 </div>
-                                
-                                <p class="text-lg text-gray-600">
-                                    ${percentage >= 80 ? 'Amazing! You really know your classmates!' :
-                                      percentage >= 60 ? 'Great job! You know your classmates well.' :
-                                      percentage >= 40 ? 'Not bad! There\'s still more to learn.' :
-                                      'Time to get to know your classmates better!'}
-                                </p>
-                                
-                                <div class="text-sm text-gray-500">
-                                    Thanks for playing "Gotten to Know You!"
+                                <div class="text-lg font-bold text-gray-800">Look at the main screen for the question!</div>
+                                <div class="text-sm text-gray-600 mt-2">Choose your answer below:</div>
+                            </div>
+                            
+                            <!-- Timer -->
+                            <div class="flex justify-center mb-6">
+                                <div id="student-timer" class="w-16 h-16 rounded-full flex items-center justify-center text-xl font-bold ${currentGame.timeLeft <= 5 ? 'bg-red-500 animate-pulse' : 'bg-gradient-to-r from-green-400 to-blue-500'} text-white">
+                                    ${currentGame.timeLeft || 15}
+                                </div>
+                            </div>
+                            
+                            <!-- Answer Buttons -->
+                            <div class="space-y-3" id="student-options">
+                                ${question.options.map((option, index) => `
+                                    <button onclick="submitStudentAnswer(${index})" 
+                                            class="student-option w-full p-4 rounded-2xl font-semibold text-lg transition-all duration-300 transform hover:scale-105 ${getStudentOptionStyle(index)}"
+                                            ${currentGame.timeLeft <= 0 ? 'disabled' : ''}>
+                                        <span class="text-2xl font-bold mr-3">${String.fromCharCode(65 + index)}</span>
+                                        ${option}
+                                    </button>
+                                `).join('')}
+                            </div>
+                            
+                            <!-- Score Display -->
+                            <div class="mt-6 text-center">
+                                <div class="bg-gray-100 px-4 py-2 rounded-xl">
+                                    <span class="text-sm text-gray-600">Your Score: </span>
+                                    <span class="font-bold text-gray-800">${score}/${questionNum - 1}</span>
                                 </div>
                             </div>
                         </div>
                     </div>
-                `;
+                </div>
+            `;
+        }
+        
+        function getStudentOptionStyle(index) {
+            const styles = [
+                'bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white shadow-lg',
+                'bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white shadow-lg',
+                'bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white shadow-lg',
+                'bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700 text-white shadow-lg'
+            ];
+            return styles[index] || 'bg-gray-500 text-white shadow-lg';
+        }
+        
+        function submitStudentAnswer(selectedIndex) {
+            const question = currentGame.questionData;
+            const buttons = document.querySelectorAll('.student-option');
+            
+            // Disable all buttons
+            buttons.forEach((btn, index) => {
+                btn.disabled = true;
+                btn.onclick = null;
+                
+                if (index === question.correctIndex) {
+                    btn.className = 'student-option w-full p-4 rounded-2xl font-semibold text-lg bg-green-500 text-white';
+                    btn.innerHTML += ' ✅';
+                } else if (index === selectedIndex) {
+                    btn.className = 'student-option w-full p-4 rounded-2xl font-semibold text-lg bg-red-500 text-white';
+                    btn.innerHTML += ' ❌';
+                } else {
+                    btn.className = 'student-option w-full p-4 rounded-2xl font-semibold text-lg bg-gray-300 text-gray-700';
+                }
+            });
+            
+            // Update score
+            if (selectedIndex === question.correctIndex) {
+                score++;
             }
             
-            function updatePlayersList(players) {
-                const playersList = document.getElementById('players-list');
-                const playerCount = document.getElementById('player-count');
-                const startBtn = document.getElementById('start-game');
-                
-                if (playersList) {
-                    playerCount.textContent = players.length;
-                    playersList.innerHTML = players.map(player => `
-                        <div class="bg-gradient-to-r from-green-100 to-blue-100 p-4 rounded-2xl border-2 border-green-200">
-                            <div class="flex items-center">
-                                <span class="mr-3 text-xl">✅</span>
-                                <div>
-                                    <p class="font-semibold text-gray-800">${player.name}</p>
-                                    <p class="text-sm text-gray-600">✓ Fact submitted</p>
-                                </div>
+            // Show waiting for next question
+            setTimeout(() => {
+                const app = document.getElementById('app');
+                app.innerHTML = `
+                    <div class="min-h-screen bg-gradient-to-br from-green-600 via-teal-600 to-blue-600 flex items-center justify-center p-4 fade-in">
+                        <div class="bg-white rounded-3xl shadow-2xl p-8 max-w-md w-full text-center">
+                            <div class="text-4xl mb-4">${selectedIndex === question.correctIndex ? '🎉' : '😅'}</div>
+                            <h2 class="text-2xl font-bold text-gray-800 mb-4">
+                                ${selectedIndex === question.correctIndex ? 'Correct!' : 'Not quite!'}
+                            </h2>
+                            <p class="text-gray-600 mb-4">Your Score: ${score}/${(currentGame.currentQuestion || 0) + 1}</p>
+                            <p class="text-sm text-gray-500">Waiting for next question...</p>
+                        </div>
+                    </div>
+                `;
+            }, 2000);
+        }
+        
+        function renderStudentFinalResults() {
+            const totalQuestions = currentGame.players.length;
+            const percentage = Math.round((score / totalQuestions) * 100);
+            const app = document.getElementById('app');
+            
+            app.innerHTML = `
+                <div class="min-h-screen bg-gradient-to-br from-yellow-600 via-orange-600 to-red-600 flex items-center justify-center p-4 fade-in">
+                    <div class="bg-white rounded-3xl shadow-2xl p-8 max-w-md w-full text-center">
+                        <div class="mb-8">
+                            <div class="bg-gradient-to-r from-yellow-400 to-orange-500 rounded-full w-20 h-20 flex items-center justify-center mx-auto mb-4 text-4xl">
+                                🏆
+                            </div>
+                            <h2 class="text-3xl font-bold text-gray-800 mb-2">Game Complete!</h2>
+                        </div>
+                        
+                        <div class="space-y-6">
+                            <div class="bg-gradient-to-r from-yellow-100 to-orange-100 p-6 rounded-2xl">
+                                <h3 class="text-2xl font-bold text-gray-800 mb-2">Your Score</h3>
+                                <div class="text-5xl font-bold text-orange-600 mb-2">${score}</div>
+                                <div class="text-lg text-gray-600">out of ${totalQuestions} questions</div>
+                                <div class="text-2xl font-semibold text-gray-800 mt-2">${percentage}%</div>
+                            </div>
+                            
+                            <div class="flex justify-center text-6xl">
+                                ${percentage >= 80 ? '🏆' : percentage >= 60 ? '🥈' : percentage >= 40 ? '🥉' : '🎯'}
+                            </div>
+                            
+                            <p class="text-lg text-gray-600">
+                                ${percentage >= 80 ? 'Amazing! You really know your classmates!' :
+                                  percentage >= 60 ? 'Great job! You know your classmates well.' :
+                                  percentage >= 40 ? 'Not bad! There\'s still more to learn.' :
+                                  'Time to get to know your classmates better!'}
+                            </p>
+                            
+                            <div class="text-sm text-gray-500">
+                                Thanks for playing "Gotten to Know You!"
                             </div>
                         </div>
-                    `).join('');
-                    
-                    if (startBtn) {
-                        if (players.length >= 2) {
-                            startBtn.disabled = false;
-                            startBtn.textContent = 'Start Game!';
-                            startBtn.onclick = async () => {
-                                // Mark game as started and prepare questions
-                                gameQuestions = generateQuestions(currentGame.players);
-                                currentQuestion = 0;
-                                gamePhase = 'question';
-                                timeLeft = 15;
-                                
-                                currentGame.isStarted = true;
-                                currentGame.currentQuestion = currentQuestion;
-                                currentGame.gamePhase = gamePhase;
-                                currentGame.timeLeft = timeLeft;
-                                currentGame.questionData = gameQuestions[currentQuestion];
-                                
-                                await saveToFirebase(gameCode, currentGame);
-                                
-                                // Switch to teacher game view
-                                gameState = 'teacher-game-control';
-                                renderTeacherGameControl();
-                            };
-                        } else {
-                            startBtn.disabled = true;
-                            startBtn.textContent = `Start Game (Need ${2 - players.length} more players)`;
-                        }
-                    }
-                }
-            }
+                    </div>
+                </div>
+            `;
+        }
+        
+        // Make functions global for onclick handlers
+        window.submitStudentAnswer = submitStudentAnswer;
+        
+        // Initialize the game
+        function init() {
+            console.log('Initializing game...');
             
-            function showError(msg) {
-                const errorDiv = document.getElementById('error-msg');
-                errorDiv.textContent = msg;
-                errorDiv.classList.remove('hidden');
-            }
-            
-            function showError2(msg) {
-                const errorDiv = document.getElementById('error-msg2');
-                errorDiv.textContent = msg;
-                errorDiv.classList.remove('hidden');
-            }
-            
-            // Check for game URL parameter
+            // Check for game code in URL
             const urlParams = new URLSearchParams(window.location.search);
-            const gameParam = urlParams.get('game');
-            if (gameParam) {
-                try {
-                    currentGame = JSON.parse(atob(gameParam));
-                    gameCode = currentGame.code;
-                    gameState = 'student-submit';
-                    renderStudentSubmit();
-                    return;
-                } catch (e) {
-                    console.error('Invalid game URL');
-                }
-            }
+            const codeParam = urlParams.get('code');
             
-            // Start with menu
-            renderMenu();
+            if (codeParam) {
+                console.log('Found game code in URL:', codeParam);
+                gameCode = codeParam.toUpperCase();
+                gameState = 'student-join';
+                // Auto-fill the code and show join screen
+                setTimeout(() => {
+                    renderStudentJoin();
+                    setTimeout(() => {
+                        const input = document.getElementById('game-code-input');
+                        if (input) {
+                            input.value = gameCode;
+                        }
+                    }, 100);
+                }, 100);
+            } else {
+                // Start with menu
+                setTimeout(() => {
+                    renderMenu();
+                }, 500); // Small delay to show loading
+            }
+        }
+        
+        // Start the game when DOM is loaded
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', init);
+        } else {
+            init();
+        }
+        
+        // Cleanup on page unload
+        window.addEventListener('beforeunload', () => {
+            stopPolling();
+            if (timerInterval) clearInterval(timerInterval);
         });
     </script>
 </body>
