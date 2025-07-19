@@ -1161,8 +1161,17 @@ Status: ${currentGame.isStarted ? 'Started' : 'Waiting'}
         async function init() {
             console.log('Initializing game with Firebase...');
             
-            // Test Firebase connection
-            await testFirebaseConnection();
+            // Test Firebase connection inline
+            try {
+                const response = await fetch(`${firebaseConfig.databaseURL}/.json`, {
+                    method: 'GET'
+                });
+                isFirebaseAvailable = response.ok;
+                console.log('Firebase connection test:', isFirebaseAvailable ? 'SUCCESS' : 'FAILED');
+            } catch (error) {
+                console.log('Firebase connection failed:', error.message);
+                isFirebaseAvailable = false;
+            }
             
             if (isFirebaseAvailable) {
                 console.log('🔥 Firebase is available - multi-device support enabled!');
