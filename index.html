@@ -346,13 +346,23 @@
                 console.log('Saving game to Firebase...');
                 await saveToFirebase(gameCode, currentGame);
                 
-                // Verify the game was saved by trying to load it immediately
+                // Wait a moment then verify the game was saved by trying to load it
                 console.log('Verifying game was saved...');
+                await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second
+                
                 const verification = await loadFromFirebase(gameCode);
                 if (verification) {
                     console.log('✅ Game creation verified successfully');
                 } else {
-                    console.log('⚠️ Game verification failed, but continuing...');
+                    console.log('⚠️ Game verification failed - trying again...');
+                    // Try saving again
+                    await saveToFirebase(gameCode, currentGame);
+                    const secondVerification = await loadFromFirebase(gameCode);
+                    if (secondVerification) {
+                        console.log('✅ Game verified on second attempt');
+                    } else {
+                        console.log('❌ Game verification failed twice');
+                    }
                 }
                 
                 console.log('✅ Game created successfully');
