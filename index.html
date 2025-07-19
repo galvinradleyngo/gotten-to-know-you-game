@@ -95,25 +95,35 @@
             });
         }
         
-        // In-memory game storage (since localStorage might not work in all environments)
+        // Enhanced storage that works across browser tabs
         let gameDatabase = {};
         
+        // Save to both memory and localStorage, and also broadcast to other tabs
         async function saveToFirebase(code, data) {
             console.log('=== SAVE OPERATION START ===');
             console.log('Code:', code);
             console.log('Data:', JSON.stringify(data, null, 2));
             
             try {
-                // Save to in-memory database (primary)
-                gameDatabase[code] = JSON.parse(JSON.stringify(data)); // Deep copy
-                console.log('✅ Successfully saved to in-memory database');
+                // Save to in-memory database
+                gameDatabase[code] = JSON.parse(JSON.stringify(data));
+                console.log('✅ Saved to in-memory database');
                 
-                // Try localStorage as backup (don't fail if this doesn't work)
+                // Save to localStorage (this works across tabs)
                 try {
                     localStorage.setItem('game-' + code, JSON.stringify(data));
-                    console.log('✅ Also saved to localStorage');
+                    localStorage.setItem('game-' + code + '-timestamp', Date.now().toString());
+                    console.log('✅ Saved to localStorage');
+                    
+                    // Broadcast storage event to other tabs
+                    window.dispatchEvent(new StorageEvent('storage', {
+                        key: 'game-' + code,
+                        newValue: JSON.stringify(data)
+                    }));
+                    console.log('✅ Broadcasted to other tabs');
+                    
                 } catch (lsError) {
-                    console.log('⚠️ localStorage not available, continuing with in-memory storage');
+                    console.log('⚠️ localStorage failed:', lsError.message);
                 }
                 
                 console.log('Current game database keys:', Object.keys(gameDatabase));
@@ -121,7 +131,6 @@
                 
             } catch (err) {
                 console.error('❌ Error saving game data:', err);
-                // Don't throw - just log and continue
                 return false;
             }
         }
@@ -129,21 +138,22 @@
         async function loadFromFirebase(code) {
             console.log('=== LOAD OPERATION START ===');
             console.log('Loading game data for code:', code);
-            console.log('Available games in database:', Object.keys(gameDatabase));
+            console.log('Available in memory:', Object.keys(gameDatabase));
             
-            // Try in-memory database first
+            // Try in-memory first
             if (gameDatabase[code]) {
-                console.log('✅ Found game in in-memory database');
-                return JSON.parse(JSON.stringify(gameDatabase[code])); // Return deep copy
+                console.log('✅ Found game in memory');
+                return JSON.parse(JSON.stringify(gameDatabase[code]));
             }
             
-            // Try localStorage as fallback
+            // Try localStorage
             try {
                 const saved = localStorage.getItem('game-' + code);
                 if (saved) {
                     const data = JSON.parse(saved);
-                    console.log('✅ Found game in localStorage, copying to memory');
-                    gameDatabase[code] = data; // Add to memory for next time
+                    console.log('✅ Found game in localStorage');
+                    // Add to memory for faster access
+                    gameDatabase[code] = data;
                     return data;
                 }
             } catch (err) {
@@ -151,6 +161,21 @@
             }
             
             console.log('❌ No game found for code:', code);
+            
+            // Show what's available for debugging
+            const allLocalStorageGames = [];
+            try {
+                for (let i = 0; i < localStorage.length; i++) {
+                    const key = localStorage.key(i);
+                    if (key && key.startsWith('game-') && !key.endsWith('-timestamp')) {
+                        allLocalStorageGames.push(key.replace('game-', ''));
+                    }
+                }
+                console.log('Available games in localStorage:', allLocalStorageGames);
+            } catch (e) {
+                console.log('Could not check localStorage');
+            }
+            
             return null;
         }
         
@@ -446,19 +471,12 @@ Status: ${currentGame.isStarted ? 'Started' : 'Waiting'}
                         console.log('❌ No game found for code:', code);
                         
                         // Let's also check what games exist
-                        console.log('Checking available games...');
-                        console.log('In-memory database:', gameDatabase);
-                        console.log('Available game codes:', Object.keys(gameDatabase));
+                        console.log('❌ No game found for code:', code);
                         
-                        // Try localStorage too
-                        try {
-                            const allKeys = Object.keys(localStorage).filter(key => key.startsWith('game-'));
-                            console.log('Found localStorage game keys:', allKeys);
-                        } catch (lsError) {
-                            console.log('Cannot access localStorage');
-                        }
+                        // Show available games from all sources
+                        const availableGames = await showAvailableGames();
                         
-                        showError('join-error', `Game not found! Please check the code. Available games: ${Object.keys(gameDatabase).join(', ') || 'None'}`);
+                        showError('join-error', `Game not found! Please check the code. Available games: ${availableGames.join(', ') || 'None'}`);
                         btn.disabled = false;
                         btn.textContent = '🎯 Join Game';
                         return;
@@ -1139,9 +1157,48 @@ Status: ${currentGame.isStarted ? 'Started' : 'Waiting'}
             renderMenu();
         };
         
-        // Initialize the game
-        function init() {
-            console.log('Initializing game...');
+        // Initialize the game and set up Firebase connectivity
+        async function init() {
+            console.log('Initializing game with Firebase...');
+            
+            // Test Firebase connection
+            await testFirebaseConnection();
+            
+            if (isFirebaseAvailable) {
+                console.log('🔥 Firebase is available - multi-device support enabled!');
+            } else {
+                console.log('⚠️ Firebase unavailable - falling back to local storage (same device only)');
+            }
+            
+            // Load any existing games from localStorage into memory (for faster access)
+            try {
+                for (let i = 0; i < localStorage.length; i++) {
+                    const key = localStorage.key(i);
+                    if (key && key.startsWith('game-') && !key.endsWith('-timestamp')) {
+                        const code = key.replace('game-', '');
+                        const data = JSON.parse(localStorage.getItem(key));
+                        gameDatabase[code] = data;
+                        console.log('Cached game from localStorage:', code);
+                    }
+                }
+            } catch (e) {
+                console.log('Could not load from localStorage:', e);
+            }
+            
+            // Listen for storage events from other tabs (still useful for same-device multi-tab)
+            window.addEventListener('storage', (e) => {
+                if (e.key && e.key.startsWith('game-') && !e.key.endsWith('-timestamp') && e.newValue) {
+                    const code = e.key.replace('game-', '');
+                    try {
+                        gameDatabase[code] = JSON.parse(e.newValue);
+                        console.log('Received game update from another tab:', code);
+                    } catch (err) {
+                        console.log('Failed to parse storage event:', err);
+                    }
+                }
+            });
+            
+            console.log('Available games at startup:', Object.keys(gameDatabase));
             
             // Check for game code in URL
             const urlParams = new URLSearchParams(window.location.search);
