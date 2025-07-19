@@ -261,7 +261,7 @@
                 </div>
             `;
             
-            document.getElementById('create-btn').addEventListener('click', () => {
+            document.getElementById('create-btn').addEventListener('click', async () => {
                 console.log('=== CREATING GAME ===');
                 const btn = document.getElementById('create-btn');
                 const errorDiv = document.getElementById('setup-error');
@@ -274,40 +274,48 @@
                 btn.disabled = true;
                 btn.textContent = 'Creating...';
                 
-                // Generate game code
-                gameCode = generateGameCode();
-                console.log('Generated game code:', gameCode);
-                
-                // Create game object
-                currentGame = {
-                    code: gameCode,
-                    players: [],
-                    isStarted: false,
-                    gamePhase: 'waiting',
-                    createdAt: new Date().toISOString(),
-                    createdBy: 'teacher'
-                };
-                
-                console.log('Game object created:', currentGame);
-                
-                // Save to in-memory database immediately
-                gameDatabase[gameCode] = JSON.parse(JSON.stringify(currentGame));
-                console.log('✅ Saved to in-memory database');
-                console.log('Current database:', Object.keys(gameDatabase));
-                
-                // Try to save to localStorage as backup (don't fail if this doesn't work)
                 try {
-                    localStorage.setItem('game-' + gameCode, JSON.stringify(currentGame));
-                    console.log('✅ Also saved to localStorage backup');
-                } catch (lsError) {
-                    console.log('⚠️ localStorage backup failed (continuing anyway):', lsError.message);
+                    // Generate game code
+                    gameCode = generateGameCode();
+                    console.log('Generated game code:', gameCode);
+                    
+                    // Create game object
+                    currentGame = {
+                        code: gameCode,
+                        players: [],
+                        isStarted: false,
+                        gamePhase: 'waiting',
+                        createdAt: new Date().toISOString(),
+                        createdBy: 'teacher'
+                    };
+                    
+                    console.log('Game object created:', currentGame);
+                    
+                    // Save to Firebase, memory, and localStorage
+                    console.log('Saving game to Firebase...');
+                    await saveToFirebase(gameCode, currentGame);
+                    
+                    // Verify the game was saved by trying to load it immediately
+                    console.log('Verifying game was saved...');
+                    const verification = await loadFromFirebase(gameCode);
+                    if (verification) {
+                        console.log('✅ Game creation verified successfully');
+                    } else {
+                        console.log('⚠️ Game verification failed, but continuing...');
+                    }
+                    
+                    console.log('✅ Game created successfully');
+                    
+                    // Proceed to dashboard
+                    gameState = 'teacher-dashboard';
+                    renderTeacherDashboard();
+                    
+                } catch (error) {
+                    console.error('❌ Error creating game:', error);
+                    showError('setup-error', 'Error creating game: ' + error.message);
+                    btn.disabled = false;
+                    btn.textContent = '🎮 Create Game';
                 }
-                
-                console.log('✅ Game created successfully');
-                
-                // Proceed to dashboard
-                gameState = 'teacher-dashboard';
-                renderTeacherDashboard();
             });
             
             document.getElementById('back-btn').addEventListener('click', () => {
@@ -1133,9 +1141,10 @@ Status: ${currentGame.isStarted ? 'Started' : 'Waiting'}
                 alert('✅ Game link copied to clipboard!');
             });
         };
-        window.showDebugInfo = function() {
+        window.showDebugInfo = async function() {
             const debugInfo = `=== GAME DEBUG INFO ===
 Game Code: ${gameCode}
+Firebase Available: ${isFirebaseAvailable}
 Game State: ${JSON.stringify(currentGame, null, 2)}
 In-Memory Database: ${JSON.stringify(gameDatabase, null, 2)}
 Available Game Codes: ${Object.keys(gameDatabase).join(', ') || 'None'}
@@ -1143,13 +1152,24 @@ Time: ${new Date().toISOString()}`;
             
             console.log(debugInfo);
             
-            alert(`🔧 Debug Info:
+            // Test if we can find this game
+            try {
+                const result = await loadFromFirebase(gameCode);
+                console.log('Debug: Can we find this game?', result ? 'YES' : 'NO');
+                
+                alert(`🔧 Debug Info:
 Game Code: ${gameCode}
+Firebase: ${isFirebaseAvailable ? 'Connected' : 'Disconnected'}
 Available Games: ${Object.keys(gameDatabase).join(', ') || 'None'}
 Players: ${currentGame.players.length}
 Status: ${currentGame.isStarted ? 'Started' : 'Waiting'}
+Can Find Game: ${result ? 'YES' : 'NO'}
 
 (Full details in console - F12)`);
+            } catch (error) {
+                console.error('Debug error:', error);
+                alert('Debug test failed - check console for details');
+            }
         };
         window.backToMenu = function() {
             stopPolling();
