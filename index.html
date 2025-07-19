@@ -248,16 +248,16 @@
                 btn.disabled = true;
                 btn.textContent = 'Testing...';
                 
-                console.log('=== FIREBASE CONNECTION TEST ===');
+                console.log('=== COMPREHENSIVE FIREBASE TEST ===');
                 
                 try {
                     // Test basic connection
-                    console.log('Testing basic connection...');
+                    console.log('1. Testing basic connection...');
                     const testResponse = await fetch(`${firebaseConfig.databaseURL}/.json`);
                     console.log('Basic connection response:', testResponse.status, testResponse.ok);
                     
                     // Test writing data
-                    console.log('Testing write operation...');
+                    console.log('2. Testing write operation...');
                     const testData = { test: true, timestamp: new Date().toISOString() };
                     const writeResponse = await fetch(`${firebaseConfig.databaseURL}/test.json`, {
                         method: 'PUT',
@@ -267,14 +267,36 @@
                     console.log('Write response:', writeResponse.status, writeResponse.ok);
                     
                     // Test reading data back
-                    console.log('Testing read operation...');
+                    console.log('3. Testing read operation...');
                     const readResponse = await fetch(`${firebaseConfig.databaseURL}/test.json`);
                     const readData = await readResponse.json();
                     console.log('Read response:', readResponse.status, readResponse.ok);
                     console.log('Read data:', readData);
                     
+                    // Test games endpoint specifically
+                    console.log('4. Testing games endpoint...');
+                    const gamesResponse = await fetch(`${firebaseConfig.databaseURL}/games.json`);
+                    const gamesData = await gamesResponse.json();
+                    console.log('Games response:', gamesResponse.status, gamesResponse.ok);
+                    console.log('Games data:', gamesData);
+                    
+                    if (gamesData) {
+                        console.log('Available game codes in Firebase:', Object.keys(gamesData));
+                    } else {
+                        console.log('No games found in Firebase');
+                    }
+                    
+                    // Test specific game lookup
+                    if (gameCode) {
+                        console.log('5. Testing specific game lookup for:', gameCode);
+                        const specificResponse = await fetch(`${firebaseConfig.databaseURL}/games/${gameCode}.json`);
+                        const specificData = await specificResponse.json();
+                        console.log('Specific game response:', specificResponse.status, specificResponse.ok);
+                        console.log('Specific game data:', specificData);
+                    }
+                    
                     if (testResponse.ok && writeResponse.ok && readResponse.ok && readData) {
-                        alert('✅ Firebase is working perfectly!\n\nConnection: ✅\nWrite: ✅\nRead: ✅\n\nCheck console for details.');
+                        alert('✅ Firebase is working!\n\nConnection: ✅\nWrite: ✅\nRead: ✅\nGames endpoint: ' + (gamesResponse.ok ? '✅' : '❌') + '\n\nCheck console for details.');
                         isFirebaseAvailable = true;
                     } else {
                         alert('❌ Firebase test failed!\n\nCheck console for details.');
