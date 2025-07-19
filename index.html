@@ -220,6 +220,10 @@
                             <button id="student-btn" class="w-full bg-gradient-to-r from-green-500 to-teal-500 hover:from-green-600 hover:to-teal-600 text-white font-semibold py-4 px-6 rounded-2xl transition-all duration-300 transform hover:scale-105 shadow-lg">
                                 🎒 I'm a Student
                             </button>
+                            
+                            <button id="test-firebase-btn" class="w-full bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white font-semibold py-3 px-6 rounded-2xl transition-all duration-300 transform hover:scale-105 shadow-lg text-sm">
+                                🔥 Test Firebase Connection
+                            </button>
                         </div>
                         
                         <div class="mt-6 text-xs text-gray-500">
@@ -237,6 +241,54 @@
             document.getElementById('student-btn').addEventListener('click', () => {
                 gameState = 'student-join';
                 renderStudentJoin();
+            });
+            
+            document.getElementById('test-firebase-btn').addEventListener('click', async () => {
+                const btn = document.getElementById('test-firebase-btn');
+                btn.disabled = true;
+                btn.textContent = 'Testing...';
+                
+                console.log('=== FIREBASE CONNECTION TEST ===');
+                
+                try {
+                    // Test basic connection
+                    console.log('Testing basic connection...');
+                    const testResponse = await fetch(`${firebaseConfig.databaseURL}/.json`);
+                    console.log('Basic connection response:', testResponse.status, testResponse.ok);
+                    
+                    // Test writing data
+                    console.log('Testing write operation...');
+                    const testData = { test: true, timestamp: new Date().toISOString() };
+                    const writeResponse = await fetch(`${firebaseConfig.databaseURL}/test.json`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(testData)
+                    });
+                    console.log('Write response:', writeResponse.status, writeResponse.ok);
+                    
+                    // Test reading data back
+                    console.log('Testing read operation...');
+                    const readResponse = await fetch(`${firebaseConfig.databaseURL}/test.json`);
+                    const readData = await readResponse.json();
+                    console.log('Read response:', readResponse.status, readResponse.ok);
+                    console.log('Read data:', readData);
+                    
+                    if (testResponse.ok && writeResponse.ok && readResponse.ok && readData) {
+                        alert('✅ Firebase is working perfectly!\n\nConnection: ✅\nWrite: ✅\nRead: ✅\n\nCheck console for details.');
+                        isFirebaseAvailable = true;
+                    } else {
+                        alert('❌ Firebase test failed!\n\nCheck console for details.');
+                        isFirebaseAvailable = false;
+                    }
+                    
+                } catch (error) {
+                    console.error('Firebase test error:', error);
+                    alert('❌ Firebase test failed with error:\n\n' + error.message);
+                    isFirebaseAvailable = false;
+                }
+                
+                btn.disabled = false;
+                btn.textContent = '🔥 Test Firebase Connection';
             });
         }
         
