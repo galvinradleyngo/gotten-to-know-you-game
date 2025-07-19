@@ -104,11 +104,11 @@
             console.log('Data:', JSON.stringify(data, null, 2));
             
             try {
-                // Save to in-memory database
+                // Save to in-memory database (primary)
                 gameDatabase[code] = JSON.parse(JSON.stringify(data)); // Deep copy
                 console.log('✅ Successfully saved to in-memory database');
                 
-                // Also try localStorage as backup
+                // Try localStorage as backup (don't fail if this doesn't work)
                 try {
                     localStorage.setItem('game-' + code, JSON.stringify(data));
                     console.log('✅ Also saved to localStorage');
@@ -116,18 +116,13 @@
                     console.log('⚠️ localStorage not available, continuing with in-memory storage');
                 }
                 
-                // Verify the save
-                if (gameDatabase[code]) {
-                    console.log('✅ Verified in-memory save successful');
-                    console.log('Current game database:', Object.keys(gameDatabase));
-                    return true;
-                } else {
-                    throw new Error('In-memory save verification failed');
-                }
+                console.log('Current game database keys:', Object.keys(gameDatabase));
+                return true;
                 
             } catch (err) {
-                console.error('❌ Critical error: Could not save game data:', err);
-                throw new Error('Failed to save game data: ' + err.message);
+                console.error('❌ Error saving game data:', err);
+                // Don't throw - just log and continue
+                return false;
             }
         }
         
@@ -244,13 +239,22 @@
             document.getElementById('create-btn').addEventListener('click', async () => {
                 console.log('=== CREATING GAME ===');
                 const btn = document.getElementById('create-btn');
+                const errorDiv = document.getElementById('setup-error');
+                
+                // Clear any previous errors
+                if (errorDiv) {
+                    errorDiv.classList.add('hidden');
+                }
+                
                 btn.disabled = true;
                 btn.textContent = 'Creating...';
                 
                 try {
+                    // Generate game code
                     gameCode = generateGameCode();
                     console.log('Generated game code:', gameCode);
                     
+                    // Create game object
                     currentGame = {
                         code: gameCode,
                         players: [],
@@ -260,27 +264,30 @@
                         createdBy: 'teacher'
                     };
                     
-                    console.log('Game object to save:', currentGame);
+                    console.log('Game object created:', currentGame);
                     
-                    // Save the game
-                    await saveToFirebase(gameCode, currentGame);
+                    // Save to in-memory database immediately
+                    gameDatabase[gameCode] = JSON.parse(JSON.stringify(currentGame));
+                    console.log('✅ Saved to in-memory database');
+                    console.log('Current database:', Object.keys(gameDatabase));
                     
-                    // Verify the game was saved by trying to load it
-                    console.log('Verifying game was saved...');
-                    const verifyGame = await loadFromFirebase(gameCode);
-                    console.log('Verification result:', verifyGame);
-                    
-                    if (!verifyGame) {
-                        throw new Error('Game creation verification failed');
+                    // Try to save to localStorage as backup (don't fail if this doesn't work)
+                    try {
+                        localStorage.setItem('game-' + gameCode, JSON.stringify(currentGame));
+                        console.log('✅ Also saved to localStorage backup');
+                    } catch (lsError) {
+                        console.log('⚠️ localStorage backup failed (continuing anyway):', lsError.message);
                     }
                     
-                    console.log('✅ Game created and verified successfully');
+                    console.log('✅ Game created successfully');
                     
+                    // Proceed to dashboard
                     gameState = 'teacher-dashboard';
                     renderTeacherDashboard();
+                    
                 } catch (error) {
                     console.error('❌ Error creating game:', error);
-                    showError('setup-error', 'Error creating game. Please try again.');
+                    showError('setup-error', 'Error creating game: ' + error.message);
                     btn.disabled = false;
                     btn.textContent = '🎮 Create Game';
                 }
