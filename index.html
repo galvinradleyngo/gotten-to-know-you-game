@@ -1111,6 +1111,41 @@ Status: ${currentGame.isStarted ? 'Started' : 'Waiting'}
         
         // Make functions global for onclick handlers
         window.submitStudentAnswer = submitStudentAnswer;
+        window.copyInstructions = function() {
+            const message = `🎮 Join our class game!\n\n1. Go to: https://galvinradleyngo.github.io/gotten-to-know-you-game/\n2. Click "I'm a Student"\n3. Enter code: ${gameCode}`;
+            navigator.clipboard.writeText(message).then(() => {
+                alert('✅ Instructions copied to clipboard!');
+            });
+        };
+        window.copyGameLink = function() {
+            const link = `https://galvinradleyngo.github.io/gotten-to-know-you-game/?code=${gameCode}`;
+            navigator.clipboard.writeText(link).then(() => {
+                alert('✅ Game link copied to clipboard!');
+            });
+        };
+        window.showDebugInfo = function() {
+            const debugInfo = `=== GAME DEBUG INFO ===
+Game Code: ${gameCode}
+Game State: ${JSON.stringify(currentGame, null, 2)}
+In-Memory Database: ${JSON.stringify(gameDatabase, null, 2)}
+Available Game Codes: ${Object.keys(gameDatabase).join(', ') || 'None'}
+Time: ${new Date().toISOString()}`;
+            
+            console.log(debugInfo);
+            
+            alert(`🔧 Debug Info:
+Game Code: ${gameCode}
+Available Games: ${Object.keys(gameDatabase).join(', ') || 'None'}
+Players: ${currentGame.players.length}
+Status: ${currentGame.isStarted ? 'Started' : 'Waiting'}
+
+(Full details in console - F12)`);
+        };
+        window.backToMenu = function() {
+            stopPolling();
+            gameState = 'menu';
+            renderMenu();
+        };
         
         // Initialize the game
         function init() {
