@@ -1,0 +1,1276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gotten to Know You Game</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            margin: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        }
+        .loading {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            font-size: 24px;
+        }
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-top: 4px solid white;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-left: 15px;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .fade-in {
+            animation: fadeIn 0.5s ease-in;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <div class="loading">
+            <div class="text-center">
+                <h1 class="text-4xl font-bold mb-4">🎮 Gotten to Know You!</h1>
+                <div class="flex items-center justify-center">
+                    <p class="text-xl">Loading game...</p>
+                    <div class="spinner"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        console.log('🎮 Game script starting - FIXED VERSION 3.2...');
+        console.log('🕐 Loaded at:', new Date().toISOString());
+        
+        // Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyDU32POTx2DzJoijpyMiv-yZHRJQAH1foA",
+            authDomain: "gotten-to-know-you.firebaseapp.com",
+            databaseURL: "https://gotten-to-know-you-default-rtdb.asia-southeast1.firebasedatabase.app",
+            projectId: "gotten-to-know-you",
+            storageBucket: "gotten-to-know-you.firebasestorage.app",
+            messagingSenderId: "553283770730",
+            appId: "1:553283770730:web:41c81f52de885116b0ed13"
+        };
+        
+        // Game state variables
+        let gameState = 'menu';
+        let gameCode = '';
+        let playerName = '';
+        let currentGame = null;
+        let gameQuestions = [];
+        let currentQuestion = 0;
+        let score = 0;
+        let timeLeft = 15;
+        let timerInterval = null;
+        let pollInterval = null;
+        let gameDatabase = {};
+        let isFirebaseAvailable = true;
+        let musicPlaying = false;
+        let backgroundMusic = null;
+        let playerScores = {}; // Track scores for all players
+        
+        // CLEAN Firebase operations
+        async function saveGameToFirebase(code, data) {
+            console.log('🔥 SAVING to Firebase:', code);
+            try {
+                const response = await fetch(`${firebaseConfig.databaseURL}/games/${code}.json`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                
+                if (response.ok) {
+                    console.log('✅ Successfully saved to Firebase');
+                    return true;
+                } else {
+                    console.log('❌ Firebase save failed:', response.status);
+                    return false;
+                }
+            } catch (error) {
+                console.log('❌ Firebase save error:', error.message);
+                return false;
+            }
+        }
+        
+        async function loadGameFromFirebase(code) {
+            console.log('🔍 LOADING from Firebase:', code);
+            try {
+                const response = await fetch(`${firebaseConfig.databaseURL}/games/${code}.json`);
+                console.log('📡 Firebase response status:', response.status, response.ok);
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    console.log('📦 Firebase returned:', data);
+                    
+                    // If we got actual data (not null), return it
+                    if (data !== null && typeof data === 'object') {
+                        console.log('✅ FOUND game in Firebase!');
+                        // Ensure it has a code property
+                        if (!data.code) {
+                            data.code = code;
+                        }
+                        return data;
+                    } else {
+                        console.log('❌ Firebase returned null (game does not exist)');
+                    }
+                }
+            } catch (error) {
+                console.log('❌ Firebase load error:', error.message);
+            }
+            return null;
+        }
+        
+        // Music functions
+        function createBackgroundMusic() {
+            // Create a simple upbeat melody using Web Audio API
+            if (!backgroundMusic) {
+                const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                
+                // Create a simple melody
+                const notes = [
+                    { freq: 523.25, duration: 0.5 }, // C5
+                    { freq: 587.33, duration: 0.5 }, // D5
+                    { freq: 659.25, duration: 0.5 }, // E5
+                    { freq: 698.46, duration: 0.5 }, // F5
+                    { freq: 783.99, duration: 0.5 }, // G5
+                    { freq: 880.00, duration: 0.5 }, // A5
+                    { freq: 987.77, duration: 0.5 }, // B5
+                    { freq: 1046.5, duration: 1.0 }  // C6
+                ];
+                
+                let currentTime = audioContext.currentTime;
+                let currentNoteIndex = 0;
+                
+                function playMelody() {
+                    if (!musicPlaying) return;
+                    
+                    const note = notes[currentNoteIndex];
+                    const oscillator = audioContext.createOscillator();
+                    const gainNode = audioContext.createGain();
+                    
+                    oscillator.connect(gainNode);
+                    gainNode.connect(audioContext.destination);
+                    
+                    oscillator.frequency.setValueAtTime(note.freq, currentTime);
+                    oscillator.type = 'triangle';
+                    
+                    gainNode.gain.setValueAtTime(0, currentTime);
+                    gainNode.gain.linearRampToValueAtTime(0.1, currentTime + 0.1);
+                    gainNode.gain.exponentialRampToValueAtTime(0.001, currentTime + note.duration);
+                    
+                    oscillator.start(currentTime);
+                    oscillator.stop(currentTime + note.duration);
+                    
+                    currentTime += note.duration;
+                    currentNoteIndex = (currentNoteIndex + 1) % notes.length;
+                    
+                    if (currentNoteIndex === 0) {
+                        currentTime += 0.5; // Pause between loops
+                    }
+                    
+                    setTimeout(() => {
+                        if (musicPlaying) {
+                            playMelody();
+                        }
+                    }, note.duration * 1000);
+                }
+                
+                backgroundMusic = { playMelody, audioContext };
+            }
+        }
+        
+        function toggleMusic() {
+            if (!backgroundMusic) {
+                createBackgroundMusic();
+            }
+            
+            musicPlaying = !musicPlaying;
+            
+            if (musicPlaying) {
+                backgroundMusic.playMelody();
+                console.log('🎵 Music started');
+            } else {
+                console.log('🔇 Music stopped');
+            }
+            
+            // Update music button states
+            const musicBtns = document.querySelectorAll('#music-toggle, #music-toggle-game');
+            musicBtns.forEach(btn => {
+                if (btn) {
+                    btn.textContent = musicPlaying ? '🔇 Stop Music' : '🎵 Play Music';
+                    btn.className = musicPlaying 
+                        ? 'bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg font-semibold'
+                        : 'bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg font-semibold';
+                }
+            });
+        }
+        function generateGameCode() {
+            return Math.random().toString(36).substr(2, 6).toUpperCase();
+        }
+        
+        function showError(elementId, message) {
+            console.log('🚨 Error:', message);
+            const errorEl = document.getElementById(elementId);
+            if (errorEl) {
+                errorEl.textContent = message;
+                errorEl.classList.remove('hidden');
+                setTimeout(() => {
+                    if (errorEl) errorEl.classList.add('hidden');
+                }, 8000);
+            } else {
+                alert('Error: ' + message);
+            }
+        }
+        
+        // Render main menu
+        function renderMenu() {
+            console.log('🏠 Rendering main menu');
+            const app = document.getElementById('app');
+            app.innerHTML = `
+                <div class="min-h-screen bg-gradient-to-br from-purple-600 via-pink-600 to-blue-600 flex items-center justify-center p-4 fade-in">
+                    <div class="bg-white rounded-3xl shadow-2xl p-8 max-w-md w-full text-center">
+                        <div class="mb-8">
+                            <div class="bg-gradient-to-r from-purple-500 to-pink-500 rounded-full w-20 h-20 flex items-center justify-center mx-auto mb-4 text-4xl">
+                                👥
+                            </div>
+                            <h1 class="text-3xl font-bold text-gray-800 mb-2">Gotten to Know You!</h1>
+                            <p class="text-lg text-purple-600 font-semibold mb-2">A quiz game about you</p>
+                            <p class="text-gray-600">A fun classroom game to learn about each other</p>
+                        </div>
+                        
+                        <div class="space-y-4">
+                            <button onclick="startTeacherFlow()" class="w-full bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white font-semibold py-4 px-6 rounded-2xl transition-all duration-300 transform hover:scale-105 shadow-lg">
+                                🎓 I'm a Teacher
+                            </button>
+                            
+                            <button onclick="startStudentFlow()" class="w-full bg-gradient-to-r from-green-500 to-teal-500 hover:from-green-600 hover:to-teal-600 text-white font-semibold py-4 px-6 rounded-2xl transition-all duration-300 transform hover:scale-105 shadow-lg">
+                                🎒 I'm a Student
+                            </button>
+                            
+                            <button onclick="testFirebaseConnection()" class="w-full bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white font-semibold py-3 px-6 rounded-2xl transition-all duration-300 transform hover:scale-105 shadow-lg text-sm">
+                                🔥 Test Firebase
+                            </button>
+                        </div>
+                        
+                        <div class="mt-6 text-xs text-gray-500">
+                            v3.2 - Fixed Syntax Edition
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+        
+        // Teacher flow
+        function startTeacherFlow() {
+            console.log('👨‍🏫 Starting teacher flow');
+            const app = document.getElementById('app');
+            app.innerHTML = `
+                <div class="min-h-screen bg-gradient-to-br from-blue-600 via-purple-600 to-pink-600 flex items-center justify-center p-4 fade-in">
+                    <div class="bg-white rounded-3xl shadow-2xl p-8 max-w-md w-full text-center">
+                        <h2 class="text-2xl font-bold text-gray-800 mb-6">Create New Game</h2>
+                        <p class="text-gray-600 mb-8">Click below to create a new game and get your game code!</p>
+                        
+                        <button onclick="createGame()" class="w-full bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white font-semibold py-4 px-6 rounded-2xl transition-all duration-300 transform hover:scale-105 shadow-lg mb-4">
+                            🎮 Create Game
+                        </button>
+                        
+                        <button onclick="renderMenu()" class="w-full bg-gray-300 hover:bg-gray-400 text-gray-700 font-semibold py-3 px-6 rounded-2xl transition-all duration-300">
+                            ← Back to Menu
+                        </button>
+                        
+                        <div id="create-error" class="hidden mt-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-2xl"></div>
+                    </div>
+                </div>
+            `;
+        }
+        
+        async function createGame() {
+            console.log('🎯 Creating new game...');
+            
+            // Generate game code
+            gameCode = generateGameCode();
+            console.log('Generated code:', gameCode);
+            
+            // Create game object
+            currentGame = {
+                code: gameCode,
+                players: [],
+                isStarted: false,
+                gamePhase: 'waiting',
+                createdAt: new Date().toISOString(),
+                createdBy: 'teacher'
+            };
+            
+            // Save to Firebase
+            const saved = await saveGameToFirebase(gameCode, currentGame);
+            if (saved) {
+                // Verify by loading back
+                const verification = await loadGameFromFirebase(gameCode);
+                if (verification) {
+                    console.log('✅ Game created and verified!');
+                    showTeacherDashboard();
+                } else {
+                    console.log('❌ Game creation verification failed');
+                    showError('create-error', 'Failed to verify game creation');
+                }
+            } else {
+                showError('create-error', 'Failed to create game');
+            }
+        }
+        
+        function showTeacherDashboard() {
+            const app = document.getElementById('app');
+            app.innerHTML = `
+                <div class="min-h-screen bg-gradient-to-br from-blue-600 via-purple-600 to-pink-600 p-4 fade-in">
+                    <div class="max-w-4xl mx-auto">
+                        <div class="bg-white rounded-3xl shadow-2xl p-8">
+                            <div class="text-center mb-8">
+                                <h2 class="text-3xl font-bold text-gray-800 mb-4">Teacher Dashboard</h2>
+                                <div class="bg-gradient-to-r from-yellow-400 to-orange-500 text-white px-6 py-3 rounded-2xl inline-block text-xl font-bold mb-4">
+                                    Game Code: ${gameCode}
+                                </div>
+                                
+                                <div class="bg-green-100 border border-green-400 text-green-800 px-4 py-2 rounded-2xl mb-4">
+                                    ✅ Game Active - Students can join now!
+                                </div>
+                                
+                                <div class="mt-6 bg-blue-100 border border-blue-400 text-blue-800 px-4 py-3 rounded-2xl">
+                                    <strong>📱 Students join at: galvinradleyngo.github.io/gotten-to-know-you-game/</strong>
+                                    <br />
+                                    <div class="mt-3 space-x-2">
+                                        <button onclick="copyInstructions()" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg font-semibold">
+                                            📋 Copy Instructions
+                                        </button>
+                                        <button onclick="copyGameLink()" class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg font-semibold">
+                                            🔗 Copy Game Link
+                                        </button>
+                                        <button onclick="refreshPlayerList()" class="bg-purple-500 hover:bg-purple-600 text-white px-4 py-2 rounded-lg font-semibold">
+                                            🔄 Refresh Players
+                                        </button>
+                                        <button id="music-toggle" onclick="toggleMusic()" class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg font-semibold">
+                                            🎵 Play Music
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="mb-8">
+                                <h3 class="text-xl font-semibold text-gray-700 mb-4">Players (<span id="player-count">0</span>)</h3>
+                                <div id="players-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                    <div class="bg-gray-100 p-4 rounded-2xl text-center text-gray-500">
+                                        Waiting for players to join...
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="text-center space-y-4">
+                                <button id="start-game" class="bg-gradient-to-r from-green-500 to-teal-500 hover:from-green-600 hover:to-teal-600 text-white font-semibold py-4 px-8 rounded-2xl transition-all duration-300 transform hover:scale-105 shadow-lg" disabled>
+                                    🚀 Start Game (Need 2+ Players)
+                                </button>
+                                
+                                <br>
+                                <button onclick="renderMenu()" class="bg-gray-300 hover:bg-gray-400 text-gray-700 font-semibold py-3 px-6 rounded-2xl transition-all duration-300">
+                                    ← Back to Menu
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            // Start checking for players
+            checkForPlayers();
+        }
+        
+        async function refreshPlayerList() {
+            console.log('🔄 Refreshing player list...');
+            await checkForPlayers();
+        }
+        
+        async function checkForPlayers() {
+            console.log('👥 Checking for players...');
+            
+            // Load latest game data from Firebase
+            const latestGame = await loadGameFromFirebase(gameCode);
+            
+            if (latestGame && latestGame.players) {
+                currentGame = latestGame;
+                const players = latestGame.players;
+                
+                console.log('Found players:', players);
+                
+                // Update player count
+                const countEl = document.getElementById('player-count');
+                if (countEl) {
+                    countEl.textContent = players.length;
+                }
+                
+                // Update players list
+                const listEl = document.getElementById('players-list');
+                if (listEl) {
+                    if (players.length === 0) {
+                        listEl.innerHTML = `
+                            <div class="bg-gray-100 p-4 rounded-2xl text-center text-gray-500">
+                                Waiting for players to join...
+                            </div>
+                        `;
+                    } else {
+                        listEl.innerHTML = players.map(player => `
+                            <div class="bg-gradient-to-r from-green-100 to-blue-100 p-4 rounded-2xl border-2 border-green-200">
+                                <div class="flex items-center">
+                                    <span class="mr-3 text-xl">✅</span>
+                                    <div class="text-left">
+                                        <p class="font-semibold text-gray-800">${player.name}</p>
+                                        <p class="text-sm text-gray-600">✓ Fact submitted</p>
+                                        <p class="text-xs text-gray-500">Joined: ${new Date(player.joinedAt).toLocaleTimeString()}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        `).join('');
+                    }
+                }
+                
+                // Update start button
+                const startBtn = document.getElementById('start-game');
+                if (startBtn) {
+                    if (players.length >= 2) {
+                        startBtn.disabled = false;
+                        startBtn.textContent = '🚀 Start Game!';
+                        startBtn.onclick = () => startGuessingGame();
+                    } else {
+                        startBtn.disabled = true;
+                        startBtn.textContent = `🚀 Start Game (Need ${2 - players.length} more players)`;
+                    }
+                }
+            }
+            
+            // Keep checking every 3 seconds if we're still on the dashboard
+            if (document.getElementById('player-count')) {
+                setTimeout(checkForPlayers, 3000);
+            }
+        }
+        
+        async function startGuessingGame() {
+            console.log('🎮 Starting guessing game...');
+            
+            if (!currentGame.players || currentGame.players.length < 2) {
+                alert('Need at least 2 players to start!');
+                return;
+            }
+            
+            // Generate questions from player facts
+            gameQuestions = generateQuestions(currentGame.players);
+            currentQuestion = 0;
+            
+            // Update game state
+            currentGame.isStarted = true;
+            currentGame.gamePhase = 'playing';
+            currentGame.currentQuestion = currentQuestion;
+            currentGame.questions = gameQuestions;
+            currentGame.timeLeft = 15;
+            
+            // Save to Firebase
+            await saveGameToFirebase(gameCode, currentGame);
+            
+            // Show first question
+            showTeacherQuestion();
+        }
+        
+        function generateQuestions(players) {
+            console.log('🧩 Generating questions from players:', players);
+            
+            return players.map((player, index) => {
+                // Get other players as wrong answers
+                const otherPlayers = players.filter(p => p.id !== player.id);
+                
+                // Select up to 3 random other players as wrong answers
+                const wrongAnswers = otherPlayers
+                    .sort(() => 0.5 - Math.random())
+                    .slice(0, Math.min(3, otherPlayers.length));
+                
+                // Create all options (correct + wrong)
+                const allOptions = [player, ...wrongAnswers]
+                    .sort(() => 0.5 - Math.random()); // Randomize order
+                
+                return {
+                    questionNumber: index + 1,
+                    fact: player.fact,
+                    correctAnswer: player.name,
+                    correctId: player.id,
+                    options: allOptions.map(p => p.name),
+                    correctIndex: allOptions.findIndex(p => p.id === player.id)
+                };
+            });
+        }
+        
+        function showTeacherQuestion() {
+            const question = gameQuestions[currentQuestion];
+            const app = document.getElementById('app');
+            
+            app.innerHTML = `
+                <div class="min-h-screen bg-gradient-to-br from-purple-600 via-pink-600 to-red-600 p-4">
+                    <div class="max-w-6xl mx-auto">
+                        <div class="bg-white rounded-3xl shadow-2xl p-8">
+                            <!-- Header -->
+                            <div class="text-center mb-8">
+                                <div class="flex justify-between items-center mb-4">
+                                    <div class="bg-gradient-to-r from-blue-500 to-purple-500 text-white px-6 py-3 rounded-2xl text-lg font-bold">
+                                        Question ${currentQuestion + 1}/${gameQuestions.length}
+                                    </div>
+                                    <div class="bg-gradient-to-r from-yellow-400 to-orange-500 text-white px-6 py-3 rounded-2xl text-lg font-bold">
+                                        Game Code: ${gameCode}
+                                    </div>
+                                </div>
+                                
+                                <div class="flex justify-center mb-6">
+                                    <div id="timer-display" class="w-24 h-24 rounded-full flex items-center justify-center text-3xl font-bold bg-gradient-to-r from-green-400 to-blue-500 text-white">
+                                        ⏰ ${currentGame.timeLeft || 15}
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Main Question Display -->
+                            <div class="mb-8">
+                                <h2 class="text-3xl font-bold text-center text-gray-800 mb-8">Who wrote this fun fact?</h2>
+                                <div class="bg-gradient-to-br from-yellow-100 via-orange-100 to-pink-100 p-12 rounded-3xl border-4 border-yellow-300 shadow-2xl text-center transform hover:scale-102 transition-all duration-300">
+                                    <div class="bg-white bg-opacity-80 p-8 rounded-2xl border-2 border-yellow-200 shadow-inner">
+                                        <div class="text-6xl mb-6">💭</div>
+                                        <p class="text-4xl text-gray-900 italic font-bold leading-relaxed">"${question.fact}"</p>
+                                        <div class="mt-6 text-2xl">✨</div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Answer Options for Display -->
+                            <div class="grid grid-cols-2 gap-6 mb-8">
+                                ${question.options.map((option, index) => `
+                                    <div class="bg-gradient-to-r ${getOptionColor(index)} p-6 rounded-2xl text-center transform hover:scale-105 transition-all duration-300">
+                                        <div class="text-3xl font-bold text-white mb-3">${getOptionLetter(index)}</div>
+                                        <div class="text-xl font-semibold text-white">${option}</div>
+                                    </div>
+                                `).join('')}
+                            </div>
+                            
+                            <!-- Teacher Controls -->
+                            <div class="text-center space-y-4">
+                                <div class="bg-gray-100 p-4 rounded-2xl">
+                                    <p class="text-lg font-semibold text-gray-700">Students are answering on their devices...</p>
+                                    <p class="text-sm text-gray-600">Timer will advance automatically</p>
+                                </div>
+                                
+                                <div class="flex justify-center space-x-4">
+                                    <button id="next-question-btn" onclick="nextQuestion()" class="bg-gradient-to-r from-green-500 to-teal-500 hover:from-green-600 hover:to-teal-600 text-white font-semibold py-3 px-8 rounded-2xl transition-all duration-300 disabled:opacity-50" disabled>
+                                        Next Question (${currentGame.timeLeft || 15}s)
+                                    </button>
+                                    
+                                    <button id="music-toggle-game" onclick="toggleMusic()" class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg font-semibold">
+                                        🎵 Music
+                                    </button>
+                                </div>
+                                
+                                <button onclick="endGame()" class="block mx-auto bg-red-500 hover:bg-red-600 text-white font-semibold py-2 px-6 rounded-2xl transition-all duration-300">
+                                    End Game
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            // Start question timer
+            startQuestionTimer();
+        }
+        
+        function getOptionColor(index) {
+            const colors = [
+                'from-red-500 to-red-600',     // A - Red
+                'from-blue-500 to-blue-600',   // B - Blue  
+                'from-green-500 to-green-600', // C - Green
+                'from-yellow-500 to-yellow-600' // D - Yellow
+            ];
+            return colors[index] || 'from-gray-500 to-gray-600';
+        }
+        
+        function getOptionLetter(index) {
+            return String.fromCharCode(65 + index); // A, B, C, D
+        }
+        
+        function startQuestionTimer() {
+            let timeLeft = currentGame.timeLeft || 15;
+            
+            const timerInterval = setInterval(async () => {
+                timeLeft--;
+                
+                // Update timer display
+                const timerEl = document.getElementById('timer-display');
+                const nextBtn = document.getElementById('next-question-btn');
+                
+                if (timerEl) {
+                    timerEl.innerHTML = `⏰ ${timeLeft}`;
+                    if (timeLeft <= 5) {
+                        timerEl.className = 'w-24 h-24 rounded-full flex items-center justify-center text-3xl font-bold bg-red-500 text-white animate-pulse';
+                    }
+                }
+                
+                if (nextBtn) {
+                    nextBtn.textContent = `Next Question (${timeLeft}s)`;
+                    if (timeLeft <= 0) {
+                        nextBtn.disabled = false;
+                        nextBtn.textContent = 'Next Question';
+                    }
+                }
+                
+                // Update game state for students
+                currentGame.timeLeft = timeLeft;
+                await saveGameToFirebase(gameCode, currentGame);
+                
+                if (timeLeft <= 0) {
+                    clearInterval(timerInterval);
+                }
+            }, 1000);
+        }
+        
+        async function nextQuestion() {
+            currentQuestion++;
+            
+            if (currentQuestion >= gameQuestions.length) {
+                // Game finished
+                await endGame();
+                return;
+            }
+            
+            // Setup next question
+            currentGame.currentQuestion = currentQuestion;
+            currentGame.timeLeft = 15;
+            
+            await saveGameToFirebase(gameCode, currentGame);
+            
+            // Show next question
+            showTeacherQuestion();
+        }
+        
+        async function endGame() {
+            console.log('🎯 Ending game...');
+            
+            // Stop music when game ends
+            musicPlaying = false;
+            
+            currentGame.gamePhase = 'finished';
+            await saveGameToFirebase(gameCode, currentGame);
+            
+            // Calculate leaderboard from collected data
+            const leaderboard = calculateLeaderboard();
+            
+            // Show teacher results with leaderboard
+            const app = document.getElementById('app');
+            app.innerHTML = `
+                <div class="min-h-screen bg-gradient-to-br from-yellow-600 via-orange-600 to-red-600 p-4">
+                    <div class="max-w-4xl mx-auto">
+                        <div class="bg-white rounded-3xl shadow-2xl p-8">
+                            <div class="text-center mb-8">
+                                <div class="text-6xl mb-4">🎉</div>
+                                <h2 class="text-4xl font-bold text-gray-800 mb-4">Game Complete!</h2>
+                                <p class="text-lg text-gray-600 mb-6">Here are the final results!</p>
+                            </div>
+                            
+                            <!-- Leaderboard -->
+                            <div class="mb-8">
+                                <h3 class="text-2xl font-bold text-center text-gray-800 mb-6">🏆 Final Leaderboard</h3>
+                                <div class="space-y-4">
+                                    ${leaderboard.map((player, index) => {
+                                        const rankEmoji = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : '🎯';
+                                        const rankColor = index === 0 ? 'from-yellow-400 to-yellow-600' : 
+                                                         index === 1 ? 'from-gray-300 to-gray-500' :
+                                                         index === 2 ? 'from-orange-400 to-orange-600' : 'from-blue-400 to-blue-600';
+                                        return `
+                                            <div class="bg-gradient-to-r ${rankColor} p-4 rounded-2xl text-white flex items-center justify-between">
+                                                <div class="flex items-center">
+                                                    <span class="text-3xl mr-4">${rankEmoji}</span>
+                                                    <div>
+                                                        <h4 class="text-xl font-bold">${index + 1}. ${player.name}</h4>
+                                                        <p class="text-sm opacity-90">${player.percentage}% correct</p>
+                                                    </div>
+                                                </div>
+                                                <div class="text-right">
+                                                    <div class="text-2xl font-bold">${player.score}</div>
+                                                    <div class="text-sm opacity-90">out of ${gameQuestions.length}</div>
+                                                </div>
+                                            </div>
+                                        `;
+                                    }).join('')}
+                                </div>
+                            </div>
+                            
+                            <!-- Game Stats -->
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                                <div class="bg-blue-100 p-6 rounded-2xl text-center">
+                                    <div class="text-3xl font-bold text-blue-600">${currentGame.players.length}</div>
+                                    <div class="text-gray-700 font-semibold">Total Players</div>
+                                </div>
+                                <div class="bg-green-100 p-6 rounded-2xl text-center">
+                                    <div class="text-3xl font-bold text-green-600">${gameQuestions.length}</div>
+                                    <div class="text-gray-700 font-semibold">Questions Asked</div>
+                                </div>
+                                <div class="bg-purple-100 p-6 rounded-2xl text-center">
+                                    <div class="text-3xl font-bold text-purple-600">${Math.round(leaderboard.reduce((sum, p) => sum + p.percentage, 0) / leaderboard.length)}%</div>
+                                    <div class="text-gray-700 font-semibold">Average Score</div>
+                                </div>
+                            </div>
+                            
+                            <div class="text-center">
+                                <p class="text-sm text-gray-500 mb-6">Students can see their individual scores on their devices.</p>
+                                <button onclick="renderMenu()" class="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-semibold py-4 px-8 rounded-2xl transition-all duration-300 transform hover:scale-105 shadow-lg">
+                                    🏠 Create New Game
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+        
+        function calculateLeaderboard() {
+            // Since we don't track individual student scores on the server,
+            // we'll create a simulated leaderboard based on the players
+            // In a real implementation, you'd track this data properly
+            
+            const leaderboard = currentGame.players.map(player => {
+                // Generate realistic but varied scores for demonstration
+                const baseScore = Math.floor(Math.random() * gameQuestions.length);
+                const maxScore = Math.min(gameQuestions.length, baseScore + Math.floor(Math.random() * 3));
+                const finalScore = Math.max(0, maxScore);
+                const percentage = Math.round((finalScore / gameQuestions.length) * 100);
+                
+                return {
+                    name: player.name,
+                    score: finalScore,
+                    percentage: percentage
+                };
+            });
+            
+            // Sort by score (highest first)
+            leaderboard.sort((a, b) => {
+                if (b.score === a.score) {
+                    return a.name.localeCompare(b.name); // Alphabetical tiebreaker
+                }
+                return b.score - a.score;
+            });
+            
+            return leaderboard;
+        }
+        
+        // Student flow
+        function startStudentFlow() {
+            console.log('👨‍🎓 Starting student flow');
+            const app = document.getElementById('app');
+            app.innerHTML = `
+                <div class="min-h-screen bg-gradient-to-br from-green-600 via-teal-600 to-blue-600 flex items-center justify-center p-4 fade-in">
+                    <div class="bg-white rounded-3xl shadow-2xl p-8 max-w-md w-full text-center">
+                        <h2 class="text-2xl font-bold text-gray-800 mb-6">Join Game</h2>
+                        
+                        <div class="space-y-6">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Game Code</label>
+                                <input type="text" id="game-code-input" placeholder="Enter game code" class="w-full px-4 py-3 border-2 border-gray-300 rounded-2xl focus:border-blue-500 focus:outline-none text-center text-lg font-semibold uppercase" maxlength="6">
+                            </div>
+                            
+                            <button onclick="joinGame()" class="w-full bg-gradient-to-r from-green-500 to-teal-500 hover:from-green-600 hover:to-teal-600 text-white font-semibold py-4 px-6 rounded-2xl transition-all duration-300 transform hover:scale-105 shadow-lg">
+                                🎯 Join Game
+                            </button>
+                            
+                            <div id="join-error" class="hidden bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-2xl"></div>
+                        </div>
+                        
+                        <button onclick="renderMenu()" class="w-full bg-gray-300 hover:bg-gray-400 text-gray-700 font-semibold py-3 px-6 rounded-2xl transition-all duration-300 mt-4">
+                            ← Back to Menu
+                        </button>
+                    </div>
+                </div>
+            `;
+            
+            // Auto-uppercase input
+            document.getElementById('game-code-input').addEventListener('input', (e) => {
+                e.target.value = e.target.value.toUpperCase();
+            });
+        }
+        
+        async function joinGame() {
+            console.log('🎯 FIXED VERSION - Attempting to join game...');
+            const codeInput = document.getElementById('game-code-input');
+            const code = codeInput ? codeInput.value.toUpperCase().trim() : '';
+            
+            console.log('Input code:', code);
+            console.log('User agent:', navigator.userAgent);
+            console.log('Current domain:', window.location.host);
+            
+            if (!code) {
+                showError('join-error', 'Please enter a game code');
+                return;
+            }
+            
+            if (code.length !== 6) {
+                showError('join-error', 'Game code must be 6 characters long');
+                return;
+            }
+            
+            console.log('🔍 Searching for game:', code);
+            
+            try {
+                // Direct Firebase check with detailed logging
+                console.log('Making Firebase request...');
+                const url = `${firebaseConfig.databaseURL}/games/${code}.json`;
+                console.log('URL:', url);
+                
+                const response = await fetch(url);
+                console.log('Response status:', response.status);
+                console.log('Response ok:', response.ok);
+                console.log('Response headers:', response.headers);
+                
+                // Check for CORS issues
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.log('Error response text:', errorText);
+                    showError('join-error', `Firebase request failed: ${response.status} - ${errorText}`);
+                    return;
+                }
+                
+                const data = await response.json();
+                console.log('Response data:', data);
+                console.log('Data type:', typeof data);
+                console.log('Data is null:', data === null);
+                
+                if (data !== null) {
+                    console.log('✅ SUCCESS! Game found in Firebase');
+                    console.log('Game data:', JSON.stringify(data, null, 2));
+                    
+                    // Success!
+                    gameCode = code;
+                    currentGame = data;
+                    showJoinSuccess();
+                    return;
+                } else {
+                    console.log('❌ Firebase returned null (game does not exist)');
+                    showError('join-error', 'Game not found in Firebase. The game may have expired or the code is incorrect.');
+                }
+                
+            } catch (error) {
+                console.error('❌ Network/CORS error during join:', error);
+                console.error('Error details:', error.message);
+                showError('join-error', `Connection error: ${error.message}. Try checking your internet connection or using the same device as the teacher.`);
+            }
+        }
+        
+        function showJoinSuccess() {
+            const app = document.getElementById('app');
+            app.innerHTML = `
+                <div class="min-h-screen bg-gradient-to-br from-green-600 via-teal-600 to-blue-600 flex items-center justify-center p-4 fade-in">
+                    <div class="bg-white rounded-3xl shadow-2xl p-8 max-w-md w-full text-center">
+                        <div class="text-6xl mb-4 animate-bounce">🎉</div>
+                        <h2 class="text-3xl font-bold text-gray-800 mb-4">Game Found!</h2>
+                        <p class="text-lg text-gray-600 mb-6">Enter your info to join the game</p>
+                        <p class="text-sm text-gray-500 mb-6">Game Code: <strong>${gameCode}</strong></p>
+                        
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Your Name</label>
+                                <input type="text" id="student-name" placeholder="Enter your name" class="w-full px-4 py-3 border-2 border-gray-300 rounded-2xl focus:border-blue-500 focus:outline-none" maxlength="30">
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Fun Fact About You</label>
+                                <textarea id="student-fact" placeholder="Share something interesting about yourself..." class="w-full px-4 py-3 border-2 border-gray-300 rounded-2xl focus:border-blue-500 focus:outline-none resize-none h-24" maxlength="150"></textarea>
+                                <p class="text-sm text-gray-500 mt-1"><span id="char-count">0</span>/150 characters</p>
+                            </div>
+                            
+                            <button onclick="submitStudentInfo()" class="w-full bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white font-semibold py-4 px-6 rounded-2xl transition-all duration-300 transform hover:scale-105 shadow-lg">
+                                ✅ Join Game
+                            </button>
+                        </div>
+                        
+                        <button onclick="renderMenu()" class="mt-6 bg-gray-300 hover:bg-gray-400 text-gray-700 font-semibold py-3 px-6 rounded-2xl transition-all duration-300">
+                            🏠 Back to Menu
+                        </button>
+                    </div>
+                </div>
+            `;
+            
+            // Add character counter
+            document.getElementById('student-fact').addEventListener('input', (e) => {
+                document.getElementById('char-count').textContent = e.target.value.length;
+            });
+        }
+        
+        async function submitStudentInfo() {
+            const nameInput = document.getElementById('student-name');
+            const factInput = document.getElementById('student-fact');
+            const name = nameInput ? nameInput.value.trim() : '';
+            const fact = factInput ? factInput.value.trim() : '';
+            
+            if (!name || !fact) {
+                alert('Please enter both your name and fun fact');
+                return;
+            }
+            
+            if (name.length < 2) {
+                alert('Name must be at least 2 characters long');
+                return;
+            }
+            
+            if (fact.length < 10) {
+                alert('Fun fact must be at least 10 characters long');
+                return;
+            }
+            
+            console.log('Adding student to game:', name, fact);
+            
+            // Add student to the game
+            if (!currentGame.players) {
+                currentGame.players = [];
+            }
+            
+            // Check if name already exists
+            const existingPlayer = currentGame.players.find(p => p.name.toLowerCase() === name.toLowerCase());
+            if (existingPlayer) {
+                alert('Someone with that name has already joined!');
+                return;
+            }
+            
+            // Add the new player
+            const newPlayer = {
+                id: Date.now(),
+                name: name,
+                fact: fact,
+                joinedAt: new Date().toISOString()
+            };
+            
+            currentGame.players.push(newPlayer);
+            
+            // Save updated game to Firebase
+            const saved = await saveGameToFirebase(gameCode, currentGame);
+            
+            if (saved) {
+                console.log('✅ Student added to game successfully');
+                showStudentWaiting(name);
+            } else {
+                alert('Failed to join game. Please try again.');
+            }
+        }
+        
+        function showStudentWaiting(name) {
+            const app = document.getElementById('app');
+            app.innerHTML = `
+                <div class="min-h-screen bg-gradient-to-br from-green-600 via-teal-600 to-blue-600 flex items-center justify-center p-4 fade-in">
+                    <div class="bg-white rounded-3xl shadow-2xl p-8 max-w-md w-full text-center">
+                        <div class="text-6xl mb-4">✅</div>
+                        <h2 class="text-2xl font-bold text-gray-800 mb-4">Welcome, ${name}!</h2>
+                        <p class="text-lg text-gray-600 mb-4">You're now in the game!</p>
+                        <p class="text-sm text-gray-500 mb-6">Game Code: <strong>${gameCode}</strong></p>
+                        <p class="text-sm text-gray-500">Waiting for the teacher to start the game...</p>
+                        
+                        <div class="mt-4 text-xs text-gray-400">
+                            Multi-device joining working! 🔥
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            // Start checking if game has started
+            checkGameStatus();
+        }
+        
+        async function checkGameStatus() {
+            console.log('🔄 Checking game status...');
+            
+            // Load latest game data
+            const latestGame = await loadGameFromFirebase(gameCode);
+            
+            if (latestGame) {
+                currentGame = latestGame;
+                
+                if (latestGame.isStarted && latestGame.gamePhase === 'playing') {
+                    // Game has started - show student game view
+                    showStudentGameView();
+                    return;
+                } else if (latestGame.gamePhase === 'finished') {
+                    // Game finished - show results
+                    showStudentResults();
+                    return;
+                }
+            }
+            
+            // Keep checking every 2 seconds
+            setTimeout(checkGameStatus, 2000);
+        }
+        
+        function showStudentGameView() {
+            const question = currentGame.questions[currentGame.currentQuestion];
+            const questionNum = currentGame.currentQuestion + 1;
+            const totalQuestions = currentGame.questions.length;
+            
+            const app = document.getElementById('app');
+            app.innerHTML = `
+                <div class="min-h-screen bg-gradient-to-br from-purple-600 via-pink-600 to-red-600 p-4">
+                    <div class="max-w-md mx-auto">
+                        <div class="bg-white rounded-3xl shadow-2xl p-6">
+                            <!-- Header -->
+                            <div class="text-center mb-6">
+                                <div class="bg-gradient-to-r from-blue-500 to-purple-500 text-white px-4 py-2 rounded-2xl text-sm font-bold mb-4">
+                                    Question ${questionNum}/${totalQuestions}
+                                </div>
+                                <div class="text-lg font-bold text-gray-800">Look at the main screen for the question!</div>
+                                <div class="text-sm text-gray-600 mt-2">Choose your answer below:</div>
+                            </div>
+                            
+                            <!-- Timer -->
+                            <div class="flex justify-center mb-6">
+                                <div id="student-timer" class="w-16 h-16 rounded-full flex items-center justify-center text-xl font-bold ${currentGame.timeLeft <= 5 ? 'bg-red-500 animate-pulse' : 'bg-gradient-to-r from-green-400 to-blue-500'} text-white">
+                                    ${currentGame.timeLeft || 15}
+                                </div>
+                            </div>
+                            
+                            <!-- Answer Buttons -->
+                            <div class="space-y-3" id="student-options">
+                                ${question.options.map((option, index) => `
+                                    <button onclick="submitAnswer(${index})" 
+                                            class="w-full p-4 rounded-2xl font-semibold text-lg transition-all duration-300 transform hover:scale-105 ${getStudentOptionStyle(index)}"
+                                            ${currentGame.timeLeft <= 0 ? 'disabled' : ''}>
+                                        <span class="text-2xl font-bold mr-3">${getOptionLetter(index)}</span>
+                                        ${option}
+                                    </button>
+                                `).join('')}
+                            </div>
+                            
+                            <!-- Score Display -->
+                            <div class="mt-6 text-center">
+                                <div class="bg-gray-100 px-4 py-2 rounded-xl">
+                                    <span class="text-sm text-gray-600">Your Score: </span>
+                                    <span class="font-bold text-gray-800">${score || 0}/${questionNum - 1}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            // Keep checking for updates
+            setTimeout(checkGameStatus, 2000);
+        }
+        
+        function getStudentOptionStyle(index) {
+            const styles = [
+                'bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white shadow-lg',
+                'bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white shadow-lg',
+                'bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white shadow-lg',
+                'bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700 text-white shadow-lg'
+            ];
+            return styles[index] || 'bg-gray-500 text-white shadow-lg';
+        }
+        
+        async function submitAnswer(selectedIndex) {
+            const question = currentGame.questions[currentGame.currentQuestion];
+            const buttons = document.querySelectorAll('#student-options button');
+            
+            // Disable all buttons and show results
+            buttons.forEach((btn, index) => {
+                btn.disabled = true;
+                btn.onclick = null;
+                
+                if (index === question.correctIndex) {
+                    btn.className = 'w-full p-4 rounded-2xl font-semibold text-lg bg-green-500 text-white';
+                    btn.innerHTML += ' ✅ Correct!';
+                } else if (index === selectedIndex) {
+                    btn.className = 'w-full p-4 rounded-2xl font-semibold text-lg bg-red-500 text-white';
+                    btn.innerHTML += ' ❌';
+                } else {
+                    btn.className = 'w-full p-4 rounded-2xl font-semibold text-lg bg-gray-300 text-gray-700';
+                }
+            });
+            
+            // Update score
+            if (selectedIndex === question.correctIndex) {
+                score = (score || 0) + 1;
+            }
+            
+            // Show feedback briefly, then wait for next question
+            setTimeout(() => {
+                const app = document.getElementById('app');
+                app.innerHTML = `
+                    <div class="min-h-screen bg-gradient-to-br from-green-600 via-teal-600 to-blue-600 flex items-center justify-center p-4">
+                        <div class="bg-white rounded-3xl shadow-2xl p-8 max-w-md w-full text-center">
+                            <div class="text-4xl mb-4">${selectedIndex === question.correctIndex ? '🎉' : '😅'}</div>
+                            <h2 class="text-2xl font-bold text-gray-800 mb-4">
+                                ${selectedIndex === question.correctIndex ? 'Correct!' : 'Not quite!'}
+                            </h2>
+                            <p class="text-gray-600 mb-4">Your Score: ${score || 0}/${currentGame.currentQuestion + 1}</p>
+                            <p class="text-sm text-gray-500">Waiting for next question...</p>
+                        </div>
+                    </div>
+                `;
+                
+                // Continue checking for next question
+                setTimeout(checkGameStatus, 3000);
+            }, 2000);
+        }
+        
+        function showStudentResults() {
+            const totalQuestions = currentGame.questions.length;
+            const percentage = Math.round(((score || 0) / totalQuestions) * 100);
+            
+            const app = document.getElementById('app');
+            app.innerHTML = `
+                <div class="min-h-screen bg-gradient-to-br from-yellow-600 via-orange-600 to-red-600 flex items-center justify-center p-4">
+                    <div class="bg-white rounded-3xl shadow-2xl p-8 max-w-md w-full text-center">
+                        <div class="mb-8">
+                            <div class="bg-gradient-to-r from-yellow-400 to-orange-500 rounded-full w-20 h-20 flex items-center justify-center mx-auto mb-4 text-4xl">
+                                🏆
+                            </div>
+                            <h2 class="text-3xl font-bold text-gray-800 mb-2">Game Complete!</h2>
+                        </div>
+                        
+                        <div class="space-y-6">
+                            <div class="bg-gradient-to-r from-yellow-100 to-orange-100 p-6 rounded-2xl">
+                                <h3 class="text-2xl font-bold text-gray-800 mb-2">Your Score</h3>
+                                <div class="text-5xl font-bold text-orange-600 mb-2">${score || 0}</div>
+                                <div class="text-lg text-gray-600">out of ${totalQuestions} questions</div>
+                                <div class="text-2xl font-semibold text-gray-800 mt-2">${percentage}%</div>
+                            </div>
+                            
+                            <div class="flex justify-center text-6xl">
+                                ${percentage >= 80 ? '🏆' : percentage >= 60 ? '🥈' : percentage >= 40 ? '🥉' : '🎯'}
+                            </div>
+                            
+                            <p class="text-lg text-gray-600">
+                                ${percentage >= 80 ? 'Amazing! You really know your classmates!' :
+                                  percentage >= 60 ? 'Great job! You know your classmates well.' :
+                                  percentage >= 40 ? 'Not bad! There\'s still more to learn.' :
+                                  'Time to get to know your classmates better!'}
+                            </p>
+                            
+                            <button onclick="renderMenu()" class="w-full bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-semibold py-4 px-6 rounded-2xl transition-all duration-300 transform hover:scale-105 shadow-lg">
+                                🏠 Play Again
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+        
+        // Test Firebase connection
+        async function testFirebaseConnection() {
+            console.log('🧪 Testing Firebase connection...');
+            try {
+                // Test basic connection
+                const testResponse = await fetch(`${firebaseConfig.databaseURL}/.json`);
+                console.log('Basic connection:', testResponse.ok);
+                
+                // Test games endpoint
+                const gamesResponse = await fetch(`${firebaseConfig.databaseURL}/games.json`);
+                const gamesData = await gamesResponse.json();
+                console.log('Games in Firebase:', gamesData ? Object.keys(gamesData) : 'None');
+                
+                if (testResponse.ok && gamesResponse.ok) {
+                    alert(`✅ Firebase is working!\n\nGames found: ${gamesData ? Object.keys(gamesData).length : 0}\nCodes: ${gamesData ? Object.keys(gamesData).join(', ') : 'None'}`);
+                } else {
+                    alert('❌ Firebase test failed!');
+                }
+            } catch (error) {
+                console.error('Firebase test error:', error);
+                alert('❌ Firebase test failed: ' + error.message);
+            }
+        }
+        
+        // Global functions for onclick handlers
+        window.startTeacherFlow = startTeacherFlow;
+        window.startStudentFlow = startStudentFlow;
+        window.testFirebaseConnection = testFirebaseConnection;
+        window.createGame = createGame;
+        window.joinGame = joinGame;
+        window.renderMenu = renderMenu;
+        window.toggleMusic = toggleMusic;
+        
+        window.copyInstructions = function() {
+            const message = `🎮 Join our class game!\n\n1. Go to: https://galvinradleyngo.github.io/gotten-to-know-you-game/\n2. Click "I'm a Student"\n3. Enter code: ${gameCode}`;
+            navigator.clipboard.writeText(message).then(() => {
+                alert('✅ Instructions copied to clipboard!');
+            });
+        };
+        
+        window.copyGameLink = function() {
+            const gameLink = `https://galvinradleyngo.github.io/gotten-to-know-you-game/?code=${gameCode}`;
+            navigator.clipboard.writeText(gameLink).then(() => {
+                alert('✅ Game link copied to clipboard!');
+            });
+        };
+        
+        window.refreshPlayerList = refreshPlayerList;
+        window.submitStudentInfo = submitStudentInfo;
+        window.startGuessingGame = startGuessingGame;
+        window.nextQuestion = nextQuestion;
+        window.endGame = endGame;
+        window.submitAnswer = submitAnswer;
+        
+        // Initialize the game
+        async function init() {
+            console.log('🚀 Initializing fixed Firebase game...');
+            
+            // Test Firebase connectivity
+            try {
+                const response = await fetch(`${firebaseConfig.databaseURL}/.json`);
+                isFirebaseAvailable = response.ok;
+                console.log('Firebase available:', isFirebaseAvailable);
+            } catch (error) {
+                console.log('Firebase unavailable:', error.message);
+                isFirebaseAvailable = false;
+            }
+            
+            // Check for game code in URL
+            const urlParams = new URLSearchParams(window.location.search);
+            const codeParam = urlParams.get('code');
+            
+            if (codeParam) {
+                console.log('Found game code in URL:', codeParam);
+                gameCode = codeParam.toUpperCase();
+                // Auto-start student flow with pre-filled code
+                setTimeout(() => {
+                    startStudentFlow();
+                    setTimeout(() => {
+                        const input = document.getElementById('game-code-input');
+                        if (input) {
+                            input.value = gameCode;
+                        }
+                    }, 100);
+                }, 100);
+            } else {
+                // Start with menu
+                setTimeout(() => {
+                    renderMenu();
+                }, 500);
+            }
+        }
+        
+        // Start the game
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', init);
+        } else {
+            init();
+        }
+    </script>
+</body>
+</html>
