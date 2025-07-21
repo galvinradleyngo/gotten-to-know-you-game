@@ -139,20 +139,30 @@
         
         // Music functions
         function createBackgroundMusic() {
-            // Create a simple upbeat melody using Web Audio API
+            // Create a fun 8-bit retro melody using Web Audio API
             if (!backgroundMusic) {
                 const audioContext = new (window.AudioContext || window.webkitAudioContext)();
                 
-                // Create a simple melody
+                // Classic 8-bit style melody - inspired by retro video games
                 const notes = [
-                    { freq: 523.25, duration: 0.5 }, // C5
-                    { freq: 587.33, duration: 0.5 }, // D5
-                    { freq: 659.25, duration: 0.5 }, // E5
-                    { freq: 698.46, duration: 0.5 }, // F5
-                    { freq: 783.99, duration: 0.5 }, // G5
-                    { freq: 880.00, duration: 0.5 }, // A5
-                    { freq: 987.77, duration: 0.5 }, // B5
-                    { freq: 1046.5, duration: 1.0 }  // C6
+                    { freq: 523.25, duration: 0.25 }, // C5 - short and punchy
+                    { freq: 659.25, duration: 0.25 }, // E5
+                    { freq: 783.99, duration: 0.25 }, // G5
+                    { freq: 1046.5, duration: 0.5 },  // C6 - longer accent
+                    { freq: 987.77, duration: 0.25 }, // B5
+                    { freq: 880.00, duration: 0.25 }, // A5
+                    { freq: 783.99, duration: 0.25 }, // G5
+                    { freq: 659.25, duration: 0.5 },  // E5 - end phrase
+                    
+                    // Second phrase - lower octave
+                    { freq: 261.63, duration: 0.25 }, // C4
+                    { freq: 329.63, duration: 0.25 }, // E4
+                    { freq: 392.00, duration: 0.25 }, // G4
+                    { freq: 523.25, duration: 0.5 },  // C5
+                    { freq: 493.88, duration: 0.25 }, // B4
+                    { freq: 440.00, duration: 0.25 }, // A4
+                    { freq: 392.00, duration: 0.25 }, // G4
+                    { freq: 329.63, duration: 0.75 }  // E4 - final note
                 ];
                 
                 let currentTime = audioContext.currentTime;
@@ -169,11 +179,13 @@
                     gainNode.connect(audioContext.destination);
                     
                     oscillator.frequency.setValueAtTime(note.freq, currentTime);
-                    oscillator.type = 'triangle';
+                    // Square wave for authentic 8-bit sound!
+                    oscillator.type = 'square';
                     
+                    // Sharp attack and quick decay for 8-bit feel
                     gainNode.gain.setValueAtTime(0, currentTime);
-                    gainNode.gain.linearRampToValueAtTime(0.1, currentTime + 0.1);
-                    gainNode.gain.exponentialRampToValueAtTime(0.001, currentTime + note.duration);
+                    gainNode.gain.linearRampToValueAtTime(0.15, currentTime + 0.02); // Quick attack
+                    gainNode.gain.exponentialRampToValueAtTime(0.001, currentTime + note.duration); // Sharp decay
                     
                     oscillator.start(currentTime);
                     oscillator.stop(currentTime + note.duration);
@@ -182,7 +194,7 @@
                     currentNoteIndex = (currentNoteIndex + 1) % notes.length;
                     
                     if (currentNoteIndex === 0) {
-                        currentTime += 0.5; // Pause between loops
+                        currentTime += 1.0; // Longer pause between loops for 8-bit effect
                     }
                     
                     setTimeout(() => {
