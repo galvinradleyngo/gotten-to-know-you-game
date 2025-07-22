@@ -6,23 +6,20 @@
     <title>Gotten to Know You Game</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        * {
+        body {
             margin: 0;
             padding: 0;
-            box-sizing: border-box;
-        }
-        html, body {
-            height: 100%;
-            overflow: hidden;
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            height: 100vh;
+            width: 100vw;
+        }
+        html {
+            height: 100%;
         }
         #app {
             height: 100vh;
             width: 100vw;
             overflow: hidden;
-            position: fixed;
-            top: 0;
-            left: 0;
         }
         .loading {
             display: flex;
@@ -33,7 +30,7 @@
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
             font-size: 24px;
-            position: absolute;
+            position: fixed;
             top: 0;
             left: 0;
             z-index: 9999;
@@ -64,18 +61,12 @@
             width: 100vw;
             overflow-y: auto;
             overflow-x: hidden;
-            position: absolute;
-            top: 0;
-            left: 0;
         }
         /* Single-page screens (menu, join) should not scroll */
         .no-scroll {
             height: 100vh;
             width: 100vw;
             overflow: hidden;
-            position: absolute;
-            top: 0;
-            left: 0;
         }
     </style>
 </head>
@@ -292,23 +283,11 @@
             }
         }
         
-        // Helper function to clear and render content
-        function clearAndRender(htmlContent) {
-            const app = document.getElementById('app');
-            if (app) {
-                // Clear all existing content
-                app.innerHTML = '';
-                // Force a reflow
-                app.offsetHeight;
-                // Add new content
-                app.innerHTML = htmlContent;
-            }
-        }
-        
         // Render main menu
         function renderMenu() {
             console.log('🏠 Rendering main menu');
-            clearAndRender(`
+            const app = document.getElementById('app');
+            app.innerHTML = `
                 <div class="no-scroll bg-gradient-to-br from-purple-600 via-pink-600 to-blue-600 flex items-center justify-center p-4 fade-in">
                     <div class="bg-white rounded-3xl shadow-2xl p-8 max-w-md w-full text-center">
                         <div class="mb-8">
@@ -335,11 +314,11 @@
                         </div>
                         
                         <div class="mt-6 text-xs text-gray-500">
-                            v3.4 - Fixed Layout Edition
+                            v3.3 - Modified Edition
                         </div>
                     </div>
                 </div>
-            `);
+            `;
         }
         
         // Teacher flow
@@ -753,14 +732,26 @@
                 return;
             }
             
-            // Reset states for next question
+            // Reset ALL states for next question
             currentGame.showAnswer = false;
             currentGame.showStudentResults = false;
             studentAnswerSubmitted = false; // Reset student answer state
+            window.studentAnswerSubmitted = false; // Also reset global state
+            
+            // Clear localStorage state for new question
+            localStorage.removeItem('studentAnswerSubmitted');
+            
+            // Clear any existing timers
+            if (window.studentTimer) {
+                clearTimeout(window.studentTimer);
+            }
             
             // Setup next question
             currentGame.currentQuestion = currentQuestion;
             currentGame.timeLeft = 15;
+            
+            console.log('📊 Next question setup - Reset all states');
+            console.log('📝 Moving to question:', currentQuestion + 1);
             
             await saveGameToFirebase(gameCode, currentGame);
             
