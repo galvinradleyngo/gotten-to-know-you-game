@@ -1346,6 +1346,15 @@
             const totalQuestions = currentGame.questions.length;
             
             const app = document.getElementById('app');
+            
+            // If student has already answered, show waiting screen
+            if (studentAnswerSubmitted) {
+                const selectedAnswer = localStorage.getItem(`answer_${currentGame.currentQuestion}`);
+                const answerText = selectedAnswer ? question.options[parseInt(selectedAnswer)] : "Unknown";
+                showAnswerReceivedScreen(answerText);
+                return;
+            }
+            
             app.innerHTML = `
                 <div class="game-screen bg-gradient-to-br from-purple-600 via-pink-600 to-red-600 p-4">
                     <div class="max-w-md mx-auto">
@@ -1366,26 +1375,16 @@
                                 </div>
                             </div>
                             
-                            <!-- Answer Buttons or Results -->
+                            <!-- Answer Buttons -->
                             <div class="space-y-3" id="student-options">
-                                ${studentAnswerSubmitted ? 
-                                    // If answer already submitted, show waiting message
-                                    `<div class="text-center p-6">
-                                        <div class="text-4xl mb-4">📝</div>
-                                        <h3 class="text-xl font-bold text-gray-800 mb-2">Answer Submitted!</h3>
-                                        <p class="text-gray-600 mb-4">Waiting for the teacher to reveal the answer...</p>
-                                        <div class="w-8 h-8 mx-auto bg-blue-500 rounded-full animate-pulse"></div>
-                                    </div>` :
-                                    // Show answer options if not submitted yet
-                                    question.options.map((option, index) => `
-                                        <button onclick="submitAnswer(${index})" 
-                                                class="w-full p-4 rounded-2xl font-semibold text-lg transition-all duration-200 ${getStudentOptionStyle(index)}"
-                                                ${currentGame.timeLeft <= 0 ? 'disabled' : ''}>
-                                            <span class="text-2xl font-bold mr-3">${getOptionLetter(index)}</span>
-                                            ${option}
-                                        </button>
-                                    `).join('')
-                                }
+                                ${question.options.map((option, index) => `
+                                    <button onclick="handleStudentAnswer(${index})" 
+                                            class="w-full p-4 rounded-2xl font-semibold text-lg transition-all duration-200 ${getStudentOptionStyle(index)}"
+                                            ${currentGame.timeLeft <= 0 ? 'disabled' : ''}>
+                                        <span class="text-2xl font-bold mr-3">${getOptionLetter(index)}</span>
+                                        ${option}
+                                    </button>
+                                `).join('')}
                             </div>
                             
                             <!-- Score Display -->
@@ -1400,8 +1399,35 @@
                 </div>
             `;
             
-            // Keep checking for updates
-            setTimeout(checkGameStatus, 2000);
+            // Keep checking for updates every 3 seconds
+            setTimeout(checkGameStatus, 3000);
+        }
+        
+        // New simplified answer handler
+        function handleStudentAnswer(selectedIndex) {
+            console.log('🎯 Student selected answer:', selectedIndex);
+            
+            const question = currentGame.questions[currentGame.currentQuestion];
+            
+            // Immediately mark as answered to prevent double-submission
+            studentAnswerSubmitted = true;
+            
+            // Update score locally
+            if (selectedIndex === question.correctIndex) {
+                score = (score || 0) + 1;
+                console.log('✅ Correct answer! New score:', score);
+            } else {
+                console.log('❌ Incorrect answer. Score remains:', score || 0);
+            }
+            
+            // Store answer for this question
+            localStorage.setItem(`answer_${currentGame.currentQuestion}`, selectedIndex.toString());
+            console.log('💾 Stored answer for question', currentGame.currentQuestion);
+            
+            // Show the "answer received" screen immediately
+            const selectedAnswer = question.options[selectedIndex];
+            console.log('📝 Showing answer received screen for:', selectedAnswer);
+            showAnswerReceivedScreen(selectedAnswer);
         }
         
         function getStudentOptionStyle(index) {
