@@ -638,6 +638,7 @@
             const fact = document.getElementById('student-fact').value.trim();
             
             console.log('Student info:', { name, fact });
+            console.log('Current game state:', currentGame);
             
             if (!name || !fact) {
                 showError('submit-error', 'Please enter both your name and fun fact');
@@ -652,6 +653,12 @@
             if (fact.length < 10) {
                 showError('submit-error', 'Fun fact must be at least 10 characters');
                 return;
+            }
+            
+            // Ensure players array exists
+            if (!currentGame.players) {
+                currentGame.players = [];
+                console.log('Created empty players array');
             }
             
             // Check if name already exists
@@ -670,11 +677,8 @@
             
             console.log('Adding player:', newPlayer);
             
-            if (!currentGame.players) {
-                currentGame.players = [];
-            }
-            
             currentGame.players.push(newPlayer);
+            console.log('Updated players array:', currentGame.players);
             
             try {
                 const saved = await saveGameToFirebase(gameCode, currentGame);
