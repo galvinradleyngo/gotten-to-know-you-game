@@ -293,35 +293,45 @@
                 currentGame = latestGame;
                 const players = latestGame.players;
                 
-                document.getElementById('player-count').textContent = players.length;
-                
+                // Check if elements exist before updating them
+                const playerCountEl = document.getElementById('player-count');
                 const listEl = document.getElementById('players-list');
-                if (players.length === 0) {
-                    listEl.innerHTML = `<div class="bg-gray-100 p-3 rounded-xl text-center text-gray-500 text-sm">Waiting for players to join...</div>`;
-                } else {
-                    listEl.innerHTML = players.map(player => `
-                        <div class="bg-gradient-to-r from-green-100 to-blue-100 p-3 rounded-xl border border-green-200">
-                            <div class="flex items-center">
-                                <span class="mr-3 text-lg">✅</span>
-                                <div>
-                                    <p class="font-semibold text-gray-800">${player.name}</p>
-                                    <p class="text-xs text-gray-500">Joined: ${new Date(player.joinedAt).toLocaleTimeString()}</p>
-                                </div>
-                            </div>
-                        </div>
-                    `).join('');
+                const startBtn = document.getElementById('start-game');
+                
+                if (playerCountEl) {
+                    playerCountEl.textContent = players.length;
                 }
                 
-                const startBtn = document.getElementById('start-game');
-                if (players.length >= 2) {
-                    startBtn.disabled = false;
-                    startBtn.textContent = '🚀 Start Game!';
-                } else {
-                    startBtn.disabled = true;
-                    startBtn.textContent = `🚀 Start Game (Need ${2 - players.length} more players)`;
+                if (listEl) {
+                    if (players.length === 0) {
+                        listEl.innerHTML = `<div class="bg-gray-100 p-3 rounded-xl text-center text-gray-500 text-sm">Waiting for players to join...</div>`;
+                    } else {
+                        listEl.innerHTML = players.map(player => `
+                            <div class="bg-gradient-to-r from-green-100 to-blue-100 p-3 rounded-xl border border-green-200">
+                                <div class="flex items-center">
+                                    <span class="mr-3 text-lg">✅</span>
+                                    <div>
+                                        <p class="font-semibold text-gray-800">${player.name}</p>
+                                        <p class="text-xs text-gray-500">Joined: ${new Date(player.joinedAt).toLocaleTimeString()}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        `).join('');
+                    }
+                }
+                
+                if (startBtn) {
+                    if (players.length >= 2) {
+                        startBtn.disabled = false;
+                        startBtn.textContent = '🚀 Start Game!';
+                    } else {
+                        startBtn.disabled = true;
+                        startBtn.textContent = `🚀 Start Game (Need ${2 - players.length} more players)`;
+                    }
                 }
             }
             
+            // Only continue checking if we're still on the teacher dashboard
             if (document.getElementById('player-count')) {
                 setTimeout(checkForPlayers, 3000);
             }
