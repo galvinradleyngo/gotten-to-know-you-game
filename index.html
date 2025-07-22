@@ -634,6 +634,19 @@
         
         async function submitStudentInfo() {
             console.log('📝 Submit student info clicked');
+            
+            // FIRST: Ensure currentGame and players array exist
+            if (!currentGame) {
+                console.error('❌ No current game found');
+                showError('submit-error', 'Game session lost. Please try joining again.');
+                return;
+            }
+            
+            if (!currentGame.players) {
+                currentGame.players = [];
+                console.log('Created empty players array');
+            }
+            
             const name = document.getElementById('student-name').value.trim();
             const fact = document.getElementById('student-fact').value.trim();
             
@@ -655,13 +668,7 @@
                 return;
             }
             
-            // Ensure players array exists
-            if (!currentGame.players) {
-                currentGame.players = [];
-                console.log('Created empty players array');
-            }
-            
-            // Check if name already exists
+            // Now safely check for existing players
             const existingPlayer = currentGame.players.find(p => p.name.toLowerCase() === name.toLowerCase());
             if (existingPlayer) {
                 showError('submit-error', 'Someone with that name has already joined!');
@@ -694,6 +701,8 @@
             } catch (error) {
                 console.error('❌ Error saving player:', error);
                 showError('submit-error', 'Error joining game. Please try again.');
+                // Also log the full error for debugging
+                console.error('Full error details:', error.stack);
             }
         }
         
