@@ -297,6 +297,21 @@
         // Render main menu
         function renderMenu() {
             console.log('🏠 Rendering main menu');
+            
+            // Clear any game state that might interfere
+            studentAnswerSubmitted = false;
+            window.studentAnswerSubmitted = false;
+            localStorage.removeItem('studentAnswerSubmitted');
+            currentGame = null;
+            gameCode = '';
+            score = 0;
+            
+            // Clear any existing timers
+            if (window.studentTimer) {
+                clearTimeout(window.studentTimer);
+                window.studentTimer = null;
+            }
+            
             const app = document.getElementById('app');
             app.innerHTML = `
                 <div class="no-scroll bg-gradient-to-br from-purple-600 via-pink-600 to-blue-600 flex items-center justify-center p-4 fade-in">
@@ -330,6 +345,8 @@
                     </div>
                 </div>
             `;
+            
+            console.log('✅ Main menu rendered successfully');
         }
         
         // Teacher flow
@@ -975,6 +992,16 @@
         async function init() {
             console.log('🚀 Initializing modified Firebase game...');
             
+            // Clear any existing states that might interfere
+            studentAnswerSubmitted = false;
+            window.studentAnswerSubmitted = false;
+            localStorage.removeItem('studentAnswerSubmitted');
+            
+            // Clear any existing timers
+            if (window.studentTimer) {
+                clearTimeout(window.studentTimer);
+            }
+            
             // Test Firebase connectivity
             try {
                 const response = await fetch(`${firebaseConfig.databaseURL}/.json`);
@@ -1003,11 +1030,11 @@
                     }, 100);
                 }, 100);
             } else {
-                // Start with menu
+                // Start with menu - clear any existing content first
                 console.log('No game code in URL, showing main menu');
                 setTimeout(() => {
                     renderMenu();
-                }, 1000); // Give it a second to load
+                }, 100); // Short delay to ensure DOM is ready
             }
         }
         
@@ -1023,14 +1050,15 @@
             init();
         }
         
-        // Fallback: If after 3 seconds we're still on loading screen, force show menu
-        setTimeout(() => {
-            const app = document.getElementById('app');
-            if (app && app.innerHTML.includes('Loading game...')) {
-                console.log('🚨 Fallback: Forcing menu render after timeout');
-                renderMenu();
-            }
-        }, 3000);
+        // Remove the fallback timer that might be causing issues
+        // (This was causing the answer received screen to show on homepage)
+        // setTimeout(() => {
+        //     const app = document.getElementById('app');
+        //     if (app && app.innerHTML.includes('Loading game...')) {
+        //         console.log('🚨 Fallback: Forcing menu render after timeout');
+        //         renderMenu();
+        //     }
+        // }, 3000);
     </script>
 </body>
 </html>>
