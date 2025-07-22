@@ -408,7 +408,7 @@
                             
                             <div class="grid grid-cols-2 gap-3 mb-4">
                                 ${question.options.map((option, index) => `
-                                    <div class="bg-gradient-to-r ${getOptionColor(index)} ${currentGame.showAnswer && index === question.correctIndex ? 'ring-2 ring-green-400' : ''} p-3 rounded-lg text-center">
+                                    <div class="bg-gradient-to-r ${getOptionColor(index)} ${currentGame.showAnswer && index === question.correctIndex ? 'ring-4 ring-green-400 ring-opacity-70' : ''} p-3 rounded-lg text-center">
                                         <div class="text-xl font-bold text-white mb-1">${getOptionLetter(index)} ${currentGame.showAnswer && index === question.correctIndex ? '✅' : ''}</div>
                                         <div class="text-sm font-semibold text-white">${option}</div>
                                         ${currentGame.showAnswer && index === question.correctIndex ? '<div class="text-xs font-bold text-green-200 mt-1">CORRECT!</div>' : ''}
@@ -419,15 +419,21 @@
                             <div class="text-center space-y-2">
                                 <div class="bg-gray-100 p-2 rounded-lg">
                                     <p class="text-sm font-semibold text-gray-700">Students are answering...</p>
-                                    <p class="text-xs text-gray-600">Timer counts down automatically</p>
+                                    <p class="text-xs text-gray-600">Timer: ${currentGame.timeLeft}s remaining</p>
                                 </div>
                                 
                                 <div class="flex justify-center space-x-2">
-                                    <button id="next-question-btn" onclick="nextQuestion()" class="bg-gradient-to-r from-green-500 to-teal-500 hover:from-green-600 hover:to-teal-600 text-white font-semibold py-2 px-4 rounded-lg disabled:opacity-50" disabled>
-                                        Next Question (${currentGame.timeLeft}s)
-                                    </button>
+                                    ${!currentGame.showAnswer ? `
+                                        <button onclick="revealAnswer()" class="bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 text-white font-semibold py-2 px-4 rounded-lg">
+                                            👁️ Reveal Answer
+                                        </button>
+                                    ` : `
+                                        <button id="next-question-btn" onclick="nextQuestion()" class="bg-gradient-to-r from-green-500 to-teal-500 hover:from-green-600 hover:to-teal-600 text-white font-semibold py-2 px-4 rounded-lg">
+                                            ➡️ Next Question
+                                        </button>
+                                    `}
                                     <button onclick="endGame()" class="bg-red-500 hover:bg-red-600 text-white font-semibold py-2 px-3 rounded-lg text-sm">
-                                        End Game
+                                        🛑 End Game
                                     </button>
                                 </div>
                             </div>
@@ -443,12 +449,18 @@
             startQuestionTimer();
         }
         
+        async function revealAnswer() {
+            console.log('👁️ Teacher revealing answer');
+            currentGame.showAnswer = true;
+            await saveGameToFirebase(gameCode, currentGame);
+            showTeacherQuestion(); // Re-render to show the revealed answer
+        }
+        
         function startQuestionTimer() {
             const timer = setInterval(async () => {
                 currentGame.timeLeft--;
                 
                 const timerEl = document.getElementById('timer-display');
-                const nextBtn = document.getElementById('next-question-btn');
                 
                 if (timerEl) {
                     timerEl.textContent = currentGame.timeLeft;
@@ -457,23 +469,13 @@
                     }
                 }
                 
-                if (nextBtn) {
-                    nextBtn.textContent = `Next Question (${currentGame.timeLeft}s)`;
-                    if (currentGame.timeLeft <= 0) {
-                        nextBtn.disabled = false;
-                        nextBtn.textContent = 'Next Question';
-                        // Reveal answer when time is up
-                        currentGame.showAnswer = true;
-                        await saveGameToFirebase(gameCode, currentGame);
-                        showTeacherQuestion(); // Re-render to show correct answer
-                    }
-                }
-                
                 // Update game state for students
                 await saveGameToFirebase(gameCode, currentGame);
                 
                 if (currentGame.timeLeft <= 0) {
                     clearInterval(timer);
+                    // Don't auto-reveal - let teacher control it
+                    console.log('⏰ Time up! Waiting for teacher to reveal answer...');
                 }
             }, 1000);
         }
