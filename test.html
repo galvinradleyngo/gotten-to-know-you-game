@@ -87,6 +87,8 @@
         let playerScores = {}; // Track scores for all players
         let studentAnswerSubmitted = false; // Track if student has answered current question
         
+        // Define all functions first, then assign to window
+        
         // CLEAN Firebase operations
         async function saveGameToFirebase(code, data) {
             console.log('🔥 SAVING to Firebase:', code);
@@ -878,13 +880,6 @@
             `;
         }
         
-        // Add global assignments for game functions
-        window.showStudentWaiting = showStudentWaiting;
-        window.checkGameStatus = checkGameStatus;
-        window.showStudentGameView = showStudentGameView;
-        window.submitAnswer = submitAnswer;
-        window.showStudentResults = showStudentResults;
-        
         // Test Firebase connection
         async function testFirebaseConnection() {
             console.log('🧪 Testing Firebase connection...');
@@ -922,6 +917,27 @@
                 alert('✅ Game link copied to clipboard!');
             });
         };
+        
+        // GLOBAL FUNCTION ASSIGNMENTS - All functions exposed to window object
+        window.startTeacherFlow = startTeacherFlow;
+        window.startStudentFlow = startStudentFlow;
+        window.testFirebaseConnection = testFirebaseConnection;
+        window.createGame = createGame;
+        window.joinGame = joinGame;
+        window.renderMenu = renderMenu;
+        window.toggleMusic = toggleMusic;
+        window.showJoinSuccess = showJoinSuccess;
+        window.submitStudentInfo = submitStudentInfo;
+        window.showStudentWaiting = showStudentWaiting;
+        window.checkGameStatus = checkGameStatus;
+        window.showStudentGameView = showStudentGameView;
+        window.submitAnswer = submitAnswer;
+        window.showStudentResults = showStudentResults;
+        window.refreshPlayerList = refreshPlayerList;
+        window.startGuessingGame = startGuessingGame;
+        window.nextQuestion = nextQuestion;
+        window.endGame = endGame;
+        window.revealAnswer = revealAnswer;
         
         // Initialize the game
         async function init() {
@@ -968,22 +984,6 @@
         } else {
             init();
         }
-        
-        // Ensure all global functions are available immediately
-        window.startTeacherFlow = startTeacherFlow;
-        window.startStudentFlow = startStudentFlow;
-        window.testFirebaseConnection = testFirebaseConnection;
-        window.createGame = createGame;
-        window.joinGame = joinGame;
-        window.renderMenu = renderMenu;
-        window.toggleMusic = toggleMusic;
-        window.refreshPlayerList = refreshPlayerList;
-        window.submitStudentInfo = submitStudentInfo;
-        window.startGuessingGame = startGuessingGame;
-        window.nextQuestion = nextQuestion;
-        window.endGame = endGame;
-        window.submitAnswer = submitAnswer;
-        window.revealAnswer = revealAnswer;
     </script>
 </body>
 </html>>
@@ -1077,15 +1077,6 @@
             }
         }
         
-        // Immediately assign functions to window object
-        window.startTeacherFlow = startTeacherFlow;
-        window.startStudentFlow = startStudentFlow;
-        window.testFirebaseConnection = testFirebaseConnection;
-        window.createGame = createGame;
-        window.joinGame = joinGame;
-        window.renderMenu = renderMenu;
-        window.toggleMusic = toggleMusic;
-        
         function showJoinSuccess() {
             const app = document.getElementById('app');
             app.innerHTML = `
@@ -1176,15 +1167,12 @@
             
             if (saved) {
                 console.log('✅ Student added to game successfully');
+                playerName = name; // Store player name globally
                 showStudentWaiting(name);
             } else {
                 alert('Failed to join game. Please try again.');
             }
         }
-        
-        // Add more global assignments
-        window.showJoinSuccess = showJoinSuccess;
-        window.submitStudentInfo = submitStudentInfo;
         
         function showStudentWaiting(name) {
             const app = document.getElementById('app');
