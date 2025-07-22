@@ -988,19 +988,99 @@
         console.log('🧪 renderMenu function available:', typeof renderMenu);
         console.log('🧪 window.renderMenu available:', typeof window.renderMenu);
         
+        // Emergency reset function to force clean state
+        function forceResetToMenu() {
+            console.log('🚨 EMERGENCY RESET - Forcing clean menu state');
+            
+            // Clear ALL possible interfering states
+            studentAnswerSubmitted = false;
+            window.studentAnswerSubmitted = false;
+            currentGame = null;
+            gameCode = '';
+            score = 0;
+            currentQuestion = 0;
+            
+            // Clear ALL localStorage
+            try {
+                localStorage.clear();
+                console.log('🧹 Cleared all localStorage');
+            } catch (e) {
+                console.log('❌ Could not clear localStorage:', e);
+            }
+            
+            // Clear ALL timers
+            if (window.studentTimer) {
+                clearTimeout(window.studentTimer);
+                window.studentTimer = null;
+            }
+            
+            // Force render menu immediately
+            const app = document.getElementById('app');
+            if (app) {
+                app.innerHTML = `
+                    <div class="no-scroll bg-gradient-to-br from-purple-600 via-pink-600 to-blue-600 flex items-center justify-center p-4">
+                        <div class="bg-white rounded-3xl shadow-2xl p-8 max-w-md w-full text-center">
+                            <div class="mb-8">
+                                <div class="bg-gradient-to-r from-purple-500 to-pink-500 rounded-full w-20 h-20 flex items-center justify-center mx-auto mb-4 text-4xl">
+                                    👥
+                                </div>
+                                <h1 class="text-3xl font-bold text-gray-800 mb-2">Gotten to Know You!</h1>
+                                <p class="text-lg text-purple-600 font-semibold mb-2">A quiz game about you</p>
+                                <p class="text-gray-600">A fun classroom game to learn about each other</p>
+                            </div>
+                            
+                            <div class="space-y-4">
+                                <button onclick="startTeacherFlow()" class="w-full bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white font-semibold py-4 px-6 rounded-2xl transition-all duration-300 transform hover:scale-105 shadow-lg">
+                                    🎓 I'm a Teacher
+                                </button>
+                                
+                                <button onclick="startStudentFlow()" class="w-full bg-gradient-to-r from-green-500 to-teal-500 hover:from-green-600 hover:to-teal-600 text-white font-semibold py-4 px-6 rounded-2xl transition-all duration-300 transform hover:scale-105 shadow-lg">
+                                    🎒 I'm a Student
+                                </button>
+                                
+                                <button onclick="testFirebaseConnection()" class="w-full bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white font-semibold py-3 px-6 rounded-2xl transition-all duration-300 transform hover:scale-105 shadow-lg text-sm">
+                                    🔥 Test Firebase
+                                </button>
+                            </div>
+                            
+                            <div class="mt-6 text-xs text-gray-500">
+                                v3.3 - Emergency Reset
+                            </div>
+                            
+                            <!-- Emergency Reset Button -->
+                            <div class="mt-4">
+                                <button onclick="forceResetToMenu()" class="text-xs bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded">
+                                    🚨 Emergency Reset
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                console.log('✅ EMERGENCY: Menu forced to display');
+            } else {
+                console.error('❌ EMERGENCY: App element not found!');
+            }
+        }
+        
         // Initialize the game
         async function init() {
             console.log('🚀 Initializing modified Firebase game...');
+            console.log('📊 Initial states check:');
+            console.log('   - studentAnswerSubmitted:', studentAnswerSubmitted);
+            console.log('   - currentGame:', currentGame);
+            console.log('   - localStorage studentAnswerSubmitted:', localStorage.getItem('studentAnswerSubmitted'));
             
-            // Clear any existing states that might interfere
+            // FORCE clear any existing states that might interfere
             studentAnswerSubmitted = false;
             window.studentAnswerSubmitted = false;
-            localStorage.removeItem('studentAnswerSubmitted');
+            localStorage.clear(); // Clear everything to be safe
             
             // Clear any existing timers
             if (window.studentTimer) {
                 clearTimeout(window.studentTimer);
             }
+            
+            console.log('✅ All states cleared');
             
             // Test Firebase connectivity
             try {
@@ -1030,11 +1110,11 @@
                     }, 100);
                 }, 100);
             } else {
-                // Start with menu - clear any existing content first
-                console.log('No game code in URL, showing main menu');
+                // Start with menu - use emergency reset to be absolutely sure
+                console.log('No game code in URL, forcing clean menu');
                 setTimeout(() => {
-                    renderMenu();
-                }, 100); // Short delay to ensure DOM is ready
+                    forceResetToMenu();
+                }, 100);
             }
         }
         
