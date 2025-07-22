@@ -8,16 +8,34 @@
     <style>
         body {
             margin: 0;
+            padding: 0;
+            overflow: hidden; /* Prevent scrolling */
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            height: 100vh;
+            width: 100vw;
+        }
+        html {
+            height: 100%;
+            overflow: hidden; /* Prevent scrolling on html as well */
+        }
+        #app {
+            height: 100vh;
+            width: 100vw;
+            overflow: hidden;
         }
         .loading {
             display: flex;
             justify-content: center;
             align-items: center;
             height: 100vh;
+            width: 100vw;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
             font-size: 24px;
+            position: fixed;
+            top: 0;
+            left: 0;
+            z-index: 9999;
         }
         .spinner {
             width: 40px;
@@ -38,6 +56,13 @@
         @keyframes fadeIn {
             from { opacity: 0; transform: translateY(20px); }
             to { opacity: 1; transform: translateY(0); }
+        }
+        /* Ensure all game screens fill viewport */
+        .game-screen {
+            height: 100vh;
+            width: 100vw;
+            overflow-y: auto;
+            overflow-x: hidden;
         }
     </style>
 </head>
@@ -259,7 +284,7 @@
             console.log('🏠 Rendering main menu');
             const app = document.getElementById('app');
             app.innerHTML = `
-                <div class="min-h-screen bg-gradient-to-br from-purple-600 via-pink-600 to-blue-600 flex items-center justify-center p-4 fade-in">
+                <div class="game-screen min-h-screen bg-gradient-to-br from-purple-600 via-pink-600 to-blue-600 flex items-center justify-center p-4 fade-in">
                     <div class="bg-white rounded-3xl shadow-2xl p-8 max-w-md w-full text-center">
                         <div class="mb-8">
                             <div class="bg-gradient-to-r from-purple-500 to-pink-500 rounded-full w-20 h-20 flex items-center justify-center mx-auto mb-4 text-4xl">
@@ -297,7 +322,7 @@
             console.log('👨‍🏫 Starting teacher flow');
             const app = document.getElementById('app');
             app.innerHTML = `
-                <div class="min-h-screen bg-gradient-to-br from-blue-600 via-purple-600 to-pink-600 flex items-center justify-center p-4 fade-in">
+                <div class="game-screen min-h-screen bg-gradient-to-br from-blue-600 via-purple-600 to-pink-600 flex items-center justify-center p-4 fade-in">
                     <div class="bg-white rounded-3xl shadow-2xl p-8 max-w-md w-full text-center">
                         <h2 class="text-2xl font-bold text-gray-800 mb-6">Create New Game</h2>
                         <p class="text-gray-600 mb-8">Click below to create a new game and get your game code!</p>
@@ -939,6 +964,10 @@
         window.endGame = endGame;
         window.revealAnswer = revealAnswer;
         
+        // Debug: Test if renderMenu function is available
+        console.log('🧪 renderMenu function available:', typeof renderMenu);
+        console.log('🧪 window.renderMenu available:', typeof window.renderMenu);
+        
         // Initialize the game
         async function init() {
             console.log('🚀 Initializing modified Firebase game...');
@@ -972,18 +1001,33 @@
                 }, 100);
             } else {
                 // Start with menu
+                console.log('No game code in URL, showing main menu');
                 setTimeout(() => {
                     renderMenu();
-                }, 500);
+                }, 1000); // Give it a second to load
             }
         }
         
-        // Start the game
+        // Start the game immediately
+        console.log('🎯 Starting game initialization...');
         if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', init);
+            document.addEventListener('DOMContentLoaded', () => {
+                console.log('DOM loaded, calling init...');
+                init();
+            });
         } else {
+            console.log('DOM already ready, calling init...');
             init();
         }
+        
+        // Fallback: If after 3 seconds we're still on loading screen, force show menu
+        setTimeout(() => {
+            const app = document.getElementById('app');
+            if (app && app.innerHTML.includes('Loading game...')) {
+                console.log('🚨 Fallback: Forcing menu render after timeout');
+                renderMenu();
+            }
+        }, 3000);
     </script>
 </body>
 </html>>
