@@ -9,14 +9,12 @@
         body {
             margin: 0;
             padding: 0;
-            overflow: hidden; /* Prevent scrolling */
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
             height: 100vh;
             width: 100vw;
         }
         html {
             height: 100%;
-            overflow: hidden; /* Prevent scrolling on html as well */
         }
         #app {
             height: 100vh;
@@ -57,12 +55,18 @@
             from { opacity: 0; transform: translateY(20px); }
             to { opacity: 1; transform: translateY(0); }
         }
-        /* Ensure all game screens fill viewport */
+        /* Game screens can scroll vertically when needed */
         .game-screen {
             height: 100vh;
             width: 100vw;
             overflow-y: auto;
             overflow-x: hidden;
+        }
+        /* Single-page screens (menu, join) should not scroll */
+        .no-scroll {
+            height: 100vh;
+            width: 100vw;
+            overflow: hidden;
         }
     </style>
 </head>
@@ -284,7 +288,7 @@
             console.log('🏠 Rendering main menu');
             const app = document.getElementById('app');
             app.innerHTML = `
-                <div class="game-screen min-h-screen bg-gradient-to-br from-purple-600 via-pink-600 to-blue-600 flex items-center justify-center p-4 fade-in">
+                <div class="no-scroll bg-gradient-to-br from-purple-600 via-pink-600 to-blue-600 flex items-center justify-center p-4 fade-in">
                     <div class="bg-white rounded-3xl shadow-2xl p-8 max-w-md w-full text-center">
                         <div class="mb-8">
                             <div class="bg-gradient-to-r from-purple-500 to-pink-500 rounded-full w-20 h-20 flex items-center justify-center mx-auto mb-4 text-4xl">
@@ -322,7 +326,7 @@
             console.log('👨‍🏫 Starting teacher flow');
             const app = document.getElementById('app');
             app.innerHTML = `
-                <div class="game-screen min-h-screen bg-gradient-to-br from-blue-600 via-purple-600 to-pink-600 flex items-center justify-center p-4 fade-in">
+                <div class="no-scroll bg-gradient-to-br from-blue-600 via-purple-600 to-pink-600 flex items-center justify-center p-4 fade-in">
                     <div class="bg-white rounded-3xl shadow-2xl p-8 max-w-md w-full text-center">
                         <h2 class="text-2xl font-bold text-gray-800 mb-6">Create New Game</h2>
                         <p class="text-gray-600 mb-8">Click below to create a new game and get your game code!</p>
@@ -721,6 +725,12 @@
             
             // Re-render the teacher question view to show the correct answer
             showTeacherQuestion();
+            
+            // Send signal to students to show their results
+            setTimeout(async () => {
+                currentGame.showStudentResults = true;
+                await saveGameToFirebase(gameCode, currentGame);
+            }, 2000); // Give 2 seconds for teacher to see the correct answer
         }
         
         async function nextQuestion() {
@@ -732,9 +742,10 @@
                 return;
             }
             
-            // Reset answer reveal state for next question
+            // Reset states for next question
             currentGame.showAnswer = false;
-            studentAnswerSubmitted = false;
+            currentGame.showStudentResults = false;
+            studentAnswerSubmitted = false; // Reset student answer state
             
             // Setup next question
             currentGame.currentQuestion = currentQuestion;
@@ -1256,11 +1267,16 @@
                 currentGame = latestGame;
                 
                 if (latestGame.isStarted && latestGame.gamePhase === 'playing') {
+                    // Check if we should show student results (answer was revealed)
+                    if (latestGame.showStudentResults && studentAnswerSubmitted) {
+                        showStudentQuestionResult();
+                        return;
+                    }
                     // Game has started - show student game view
                     showStudentGameView();
                     return;
                 } else if (latestGame.gamePhase === 'finished') {
-                    // Game finished - show results
+                    // Game finished - show final results
                     showStudentResults();
                     return;
                 }
@@ -1270,6 +1286,58 @@
             setTimeout(checkGameStatus, 2000);
         }
         
+        function showStudentQuestionResult() {
+            const question = currentGame.questions[currentGame.currentQuestion];
+            const questionNum = currentGame.currentQuestion + 1;
+            
+            // Get the student's answer from when they submitted
+            const studentAnswer = localStorage.getItem(`answer_${currentGame.currentQuestion}`);
+            const selectedIndex = studentAnswer ? parseInt(studentAnswer) : -1;
+            const isCorrect = selectedIndex === question.correctIndex;
+            
+            const app = document.getElementById('app');
+            app.innerHTML = `
+                <div class="game-screen bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-600 flex items-center justify-center p-4">
+                    <div class="bg-white rounded-3xl shadow-2xl p-8 max-w-md w-full text-center">
+                        <div class="text-6xl mb-6">${isCorrect ? '🎉' : '😅'}</div>
+                        <h2 class="text-3xl font-bold text-gray-800 mb-4">
+                            ${isCorrect ? 'Correct!' : 'Not quite!'}
+                        </h2>
+                        
+                        <div class="bg-gray-100 p-4 rounded-2xl mb-4">
+                            <div class="text-sm text-gray-600 mb-2">Correct Answer:</div>
+                            <div class="text-xl font-bold text-green-600">${question.options[question.correctIndex]}</div>
+                        </div>
+                        
+                        ${selectedIndex >= 0 ? `
+                            <div class="bg-blue-50 p-4 rounded-2xl mb-4">
+                                <div class="text-sm text-gray-600 mb-2">Your Answer:</div>
+                                <div class="text-lg font-semibold ${isCorrect ? 'text-green-600' : 'text-red-600'}">${question.options[selectedIndex]}</div>
+                            </div>
+                        ` : ''}
+                        
+                        <div class="bg-gradient-to-r from-yellow-100 to-orange-100 p-4 rounded-2xl">
+                            <div class="text-lg font-bold text-gray-800">Your Score: ${score || 0}/${questionNum}</div>
+                            <div class="text-sm text-gray-600">${Math.round(((score || 0) / questionNum) * 100)}% correct</div>
+                        </div>
+                        
+                        <div class="mt-6">
+                            <p class="text-sm text-gray-500">Waiting for next question...</p>
+                            <div class="w-8 h-8 mx-auto bg-blue-500 rounded-full animate-pulse mt-2"></div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            // Store the answer for this question
+            if (selectedIndex >= 0) {
+                localStorage.setItem(`answer_${currentGame.currentQuestion}`, selectedIndex.toString());
+            }
+            
+            // Continue checking for next question
+            setTimeout(checkGameStatus, 3000);
+        }
+        
         function showStudentGameView() {
             const question = currentGame.questions[currentGame.currentQuestion];
             const questionNum = currentGame.currentQuestion + 1;
@@ -1277,7 +1345,7 @@
             
             const app = document.getElementById('app');
             app.innerHTML = `
-                <div class="min-h-screen bg-gradient-to-br from-purple-600 via-pink-600 to-red-600 p-4">
+                <div class="game-screen bg-gradient-to-br from-purple-600 via-pink-600 to-red-600 p-4">
                     <div class="max-w-md mx-auto">
                         <div class="bg-white rounded-3xl shadow-2xl p-6">
                             <!-- Header -->
@@ -1291,29 +1359,26 @@
                             
                             <!-- Timer -->
                             <div class="flex justify-center mb-6">
-                                <div id="student-timer" class="w-16 h-16 rounded-full flex items-center justify-center text-xl font-bold ${currentGame.timeLeft <= 5 ? 'bg-red-500 animate-pulse' : 'bg-gradient-to-r from-green-400 to-blue-500'} text-white">
+                                <div id="student-timer" class="w-16 h-16 rounded-full flex items-center justify-center text-xl font-bold ${currentGame.timeLeft <= 5 ? 'bg-red-500' : 'bg-gradient-to-r from-green-400 to-blue-500'} text-white">
                                     ${currentGame.timeLeft || 15}
                                 </div>
                             </div>
                             
                             <!-- Answer Buttons or Results -->
                             <div class="space-y-3" id="student-options">
-                                ${studentAnswerSubmitted && currentGame.showAnswer ? 
-                                    // Show results if answer submitted and time is up
-                                    `<div class="text-center">
-                                        <div class="text-6xl mb-4">${currentGame.showAnswer ? '🎯' : '⏳'}</div>
-                                        <h3 class="text-2xl font-bold text-gray-800 mb-4">Answer submitted!</h3>
-                                        ${currentGame.showAnswer ? 
-                                            `<p class="text-lg text-gray-600 mb-4">Correct answer: <strong>${question.options[question.correctIndex]}</strong></p>` : 
-                                            '<p class="text-lg text-gray-600 mb-4">Waiting for time to end...</p>'
-                                        }
-                                        <p class="text-sm text-gray-500">Your Score: ${score || 0}/${questionNum}</p>
+                                ${studentAnswerSubmitted ? 
+                                    // If answer already submitted, show waiting message
+                                    `<div class="text-center p-6">
+                                        <div class="text-4xl mb-4">📝</div>
+                                        <h3 class="text-xl font-bold text-gray-800 mb-2">Answer Submitted!</h3>
+                                        <p class="text-gray-600 mb-4">Waiting for the teacher to reveal the answer...</p>
+                                        <div class="w-8 h-8 mx-auto bg-blue-500 rounded-full animate-pulse"></div>
                                     </div>` :
                                     // Show answer options if not submitted yet
                                     question.options.map((option, index) => `
                                         <button onclick="submitAnswer(${index})" 
-                                                class="w-full p-4 rounded-2xl font-semibold text-lg transition-all duration-300 transform hover:scale-105 ${getStudentOptionStyle(index)}"
-                                                ${currentGame.timeLeft <= 0 || studentAnswerSubmitted ? 'disabled' : ''}>
+                                                class="w-full p-4 rounded-2xl font-semibold text-lg transition-all duration-200 ${getStudentOptionStyle(index)}"
+                                                ${currentGame.timeLeft <= 0 ? 'disabled' : ''}>
                                             <span class="text-2xl font-bold mr-3">${getOptionLetter(index)}</span>
                                             ${option}
                                         </button>
@@ -1325,7 +1390,7 @@
                             <div class="mt-6 text-center">
                                 <div class="bg-gray-100 px-4 py-2 rounded-xl">
                                     <span class="text-sm text-gray-600">Your Score: </span>
-                                    <span class="font-bold text-gray-800">${score || 0}/${questionNum - 1}</span>
+                                    <span class="font-bold text-gray-800">${score || 0}/${Math.max(0, questionNum - 1)}</span>
                                 </div>
                             </div>
                         </div>
@@ -1339,41 +1404,54 @@
         
         function getStudentOptionStyle(index) {
             const styles = [
-                'bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white shadow-lg',
-                'bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white shadow-lg',
-                'bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white shadow-lg',
-                'bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700 text-white shadow-lg'
+                'bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white shadow-md',
+                'bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white shadow-md',
+                'bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white shadow-md',
+                'bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700 text-white shadow-md'
             ];
-            return styles[index] || 'bg-gray-500 text-white shadow-lg';
+            return styles[index] || 'bg-gray-500 text-white shadow-md';
         }
         
         async function submitAnswer(selectedIndex) {
             const question = currentGame.questions[currentGame.currentQuestion];
             studentAnswerSubmitted = true;
             
-            // Update score immediately but don't show correct answer yet
+            // Store the student's answer locally
+            const studentAnswer = {
+                questionIndex: currentGame.currentQuestion,
+                selectedIndex: selectedIndex,
+                isCorrect: selectedIndex === question.correctIndex
+            };
+            
+            // Update score locally but don't show result yet
             if (selectedIndex === question.correctIndex) {
                 score = (score || 0) + 1;
             }
             
-            // Show confirmation that answer was submitted
+            // Show simple "answer received" screen - NO indication of right/wrong
             const app = document.getElementById('app');
             app.innerHTML = `
-                <div class="min-h-screen bg-gradient-to-br from-green-600 via-teal-600 to-blue-600 flex items-center justify-center p-4">
+                <div class="game-screen bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-600 flex items-center justify-center p-4">
                     <div class="bg-white rounded-3xl shadow-2xl p-8 max-w-md w-full text-center">
-                        <div class="text-4xl mb-4">✅</div>
-                        <h2 class="text-2xl font-bold text-gray-800 mb-4">Answer Submitted!</h2>
-                        <p class="text-gray-600 mb-4">Your answer: <strong>${question.options[selectedIndex]}</strong></p>
-                        <p class="text-sm text-gray-500 mb-4">Waiting for the correct answer to be revealed...</p>
-                        <div class="animate-pulse">
-                            <div class="w-12 h-12 mx-auto bg-blue-500 rounded-full mb-4"></div>
-                            <p class="text-xs text-gray-400">The teacher will show the answer when time is up</p>
+                        <div class="text-6xl mb-6">📝</div>
+                        <h2 class="text-3xl font-bold text-gray-800 mb-4">Answer Received!</h2>
+                        <p class="text-lg text-gray-600 mb-6">Your answer has been submitted successfully.</p>
+                        <p class="text-sm text-gray-500 mb-4">Wait for the teacher to reveal the correct answer...</p>
+                        
+                        <div class="bg-gray-100 p-4 rounded-2xl">
+                            <div class="text-sm text-gray-600">Your answer:</div>
+                            <div class="text-xl font-bold text-gray-800">${question.options[selectedIndex]}</div>
+                        </div>
+                        
+                        <div class="mt-6">
+                            <div class="w-12 h-12 mx-auto bg-blue-500 rounded-full animate-pulse"></div>
+                            <p class="text-xs text-gray-400 mt-2">Waiting for results...</p>
                         </div>
                     </div>
                 </div>
             `;
             
-            // Continue checking for next question or answer reveal
+            // Continue checking for game updates (answer reveal)
             setTimeout(checkGameStatus, 2000);
         }
         
