@@ -100,6 +100,7 @@
         let score = 0;
         let currentQuestion = 0;
         let studentAnswerSubmitted = false;
+        let studentCurrentQuestion = 0; // Track student's current question separately
         
         // Firebase operations
         async function saveGameToFirebase(code, data) {
