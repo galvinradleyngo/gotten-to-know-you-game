@@ -566,25 +566,38 @@
         }
         
         async function joinGame() {
+            console.log('🎯 Join game clicked');
             const input = document.getElementById('game-code-input');
-            const code = input.value.trim();
+            const code = input.value.trim().toUpperCase();
+            
+            console.log('Attempting to join with code:', code);
             
             if (!code || code.length !== 6) {
                 showError('join-error', 'Please enter a valid 6-character game code');
                 return;
             }
             
-            const game = await loadGameFromFirebase(code);
-            if (game) {
-                gameCode = code;
-                currentGame = game;
-                showJoinSuccess();
-            } else {
-                showError('join-error', 'Game not found. Please check the code.');
+            try {
+                const game = await loadGameFromFirebase(code);
+                console.log('Game lookup result:', game);
+                
+                if (game) {
+                    gameCode = code;
+                    currentGame = game;
+                    console.log('✅ Game found, showing join success');
+                    showJoinSuccess();
+                } else {
+                    console.log('❌ Game not found');
+                    showError('join-error', 'Game not found. Please check the code.');
+                }
+            } catch (error) {
+                console.error('❌ Error joining game:', error);
+                showError('join-error', 'Error joining game. Please try again.');
             }
         }
         
         function showJoinSuccess() {
+            console.log('📝 Showing join success screen');
             const app = document.getElementById('app');
             app.innerHTML = `
                 <div class="no-scroll bg-gradient-to-br from-green-600 via-teal-600 to-blue-600 flex items-center justify-center p-4">
@@ -607,6 +620,8 @@
                             <button onclick="submitStudentInfo()" class="w-full bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white font-semibold py-4 px-6 rounded-2xl transition-all duration-300 transform hover:scale-105 shadow-lg">
                                 ✅ Join Game
                             </button>
+                            
+                            <div id="submit-error" class="hidden bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-2xl"></div>
                         </div>
                         
                         <button onclick="renderMenu()" class="mt-4 bg-gray-300 hover:bg-gray-400 text-gray-700 font-semibold py-2 px-4 rounded-2xl transition-all duration-300">
@@ -618,16 +633,31 @@
         }
         
         async function submitStudentInfo() {
+            console.log('📝 Submit student info clicked');
             const name = document.getElementById('student-name').value.trim();
             const fact = document.getElementById('student-fact').value.trim();
             
+            console.log('Student info:', { name, fact });
+            
             if (!name || !fact) {
-                alert('Please enter both your name and fun fact');
+                showError('submit-error', 'Please enter both your name and fun fact');
                 return;
             }
             
-            if (name.length < 2 || fact.length < 10) {
-                alert('Name must be at least 2 characters and fact at least 10 characters');
+            if (name.length < 2) {
+                showError('submit-error', 'Name must be at least 2 characters');
+                return;
+            }
+            
+            if (fact.length < 10) {
+                showError('submit-error', 'Fun fact must be at least 10 characters');
+                return;
+            }
+            
+            // Check if name already exists
+            const existingPlayer = currentGame.players.find(p => p.name.toLowerCase() === name.toLowerCase());
+            if (existingPlayer) {
+                showError('submit-error', 'Someone with that name has already joined!');
                 return;
             }
             
@@ -638,17 +668,33 @@
                 joinedAt: new Date().toISOString()
             };
             
+            console.log('Adding player:', newPlayer);
+            
+            if (!currentGame.players) {
+                currentGame.players = [];
+            }
+            
             currentGame.players.push(newPlayer);
             
-            const saved = await saveGameToFirebase(gameCode, currentGame);
-            if (saved) {
-                showStudentWaiting();
-            } else {
-                alert('Failed to join game. Please try again.');
+            try {
+                const saved = await saveGameToFirebase(gameCode, currentGame);
+                console.log('Save result:', saved);
+                
+                if (saved) {
+                    console.log('✅ Successfully joined game');
+                    showStudentWaiting();
+                } else {
+                    console.log('❌ Failed to save to Firebase');
+                    showError('submit-error', 'Failed to join game. Please try again.');
+                }
+            } catch (error) {
+                console.error('❌ Error saving player:', error);
+                showError('submit-error', 'Error joining game. Please try again.');
             }
         }
         
         function showStudentWaiting() {
+            console.log('⏳ Showing student waiting screen');
             const app = document.getElementById('app');
             app.innerHTML = `
                 <div class="no-scroll bg-gradient-to-br from-green-600 via-teal-600 to-blue-600 flex items-center justify-center p-4">
@@ -656,7 +702,11 @@
                         <div class="text-6xl mb-4">✅</div>
                         <h2 class="text-2xl font-bold text-gray-800 mb-4">You're In!</h2>
                         <p class="text-lg text-gray-600 mb-4">Successfully joined the game</p>
-                        <p class="text-sm text-gray-500">Waiting for the teacher to start...</p>
+                        <p class="text-sm text-gray-500 mb-6">Game Code: <strong>${gameCode}</strong></p>
+                        <div class="bg-blue-50 p-4 rounded-2xl mb-6">
+                            <p class="text-lg font-semibold text-blue-800">Waiting for teacher to start the game...</p>
+                        </div>
+                        <div class="w-12 h-12 mx-auto bg-blue-500 rounded-full animate-pulse"></div>
                     </div>
                 </div>
             `;
@@ -862,6 +912,7 @@
         window.nextQuestion = nextQuestion;
         window.endGame = endGame;
         window.submitStudentAnswer = submitStudentAnswer;
+        window.showJoinSuccess = showJoinSuccess;
         
         // Initialize
         function init() {
