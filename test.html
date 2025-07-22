@@ -725,12 +725,6 @@
             
             // Re-render the teacher question view to show the correct answer
             showTeacherQuestion();
-            
-            // Send signal to students to show their results
-            setTimeout(async () => {
-                currentGame.showStudentResults = true;
-                await saveGameToFirebase(gameCode, currentGame);
-            }, 2000); // Give 2 seconds for teacher to see the correct answer
         }
         
         async function nextQuestion() {
@@ -1267,11 +1261,20 @@
                 currentGame = latestGame;
                 
                 if (latestGame.isStarted && latestGame.gamePhase === 'playing') {
-                    // Check if we should show student results (answer was revealed)
-                    if (latestGame.showStudentResults && studentAnswerSubmitted) {
-                        showStudentQuestionResult();
+                    // If student has already submitted an answer, keep them on waiting screen
+                    if (studentAnswerSubmitted) {
+                        // Check if we moved to a new question
+                        if (latestGame.currentQuestion > currentQuestion) {
+                            // New question started, reset and show new question
+                            currentQuestion = latestGame.currentQuestion;
+                            studentAnswerSubmitted = false;
+                            showStudentGameView();
+                            return;
+                        }
+                        // Stay on the "answer received" screen
                         return;
                     }
+                    
                     // Game has started - show student game view
                     showStudentGameView();
                     return;
@@ -1304,9 +1307,8 @@
                             ${isCorrect ? 'Correct!' : 'Not quite!'}
                         </h2>
                         
-                        <div class="bg-gray-100 p-4 rounded-2xl mb-4">
-                            <div class="text-sm text-gray-600 mb-2">Correct Answer:</div>
-                            <div class="text-xl font-bold text-green-600">${question.options[question.correctIndex]}</div>
+                        <div class="text-lg text-gray-600 mb-6">
+                            ${isCorrect ? 'Great job! You got it right!' : 'Better luck on the next one!'}
                         </div>
                         
                         ${selectedIndex >= 0 ? `
