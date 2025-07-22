@@ -878,6 +878,13 @@
             `;
         }
         
+        // Add global assignments for game functions
+        window.showStudentWaiting = showStudentWaiting;
+        window.checkGameStatus = checkGameStatus;
+        window.showStudentGameView = showStudentGameView;
+        window.submitAnswer = submitAnswer;
+        window.showStudentResults = showStudentResults;
+        
         // Test Firebase connection
         async function testFirebaseConnection() {
             console.log('🧪 Testing Firebase connection...');
@@ -902,15 +909,6 @@
             }
         }
         
-        // Global functions for onclick handlers
-        window.startTeacherFlow = startTeacherFlow;
-        window.startStudentFlow = startStudentFlow;
-        window.testFirebaseConnection = testFirebaseConnection;
-        window.createGame = createGame;
-        window.joinGame = joinGame;
-        window.renderMenu = renderMenu;
-        window.toggleMusic = toggleMusic;
-        
         window.copyInstructions = function() {
             const message = `🎮 Join our class game!\n\n1. Go to: https://galvinradleyngo.github.io/gotten-to-know-you-game/\n2. Click "I'm a Student"\n3. Enter code: ${gameCode}`;
             navigator.clipboard.writeText(message).then(() => {
@@ -924,14 +922,6 @@
                 alert('✅ Game link copied to clipboard!');
             });
         };
-        
-        window.refreshPlayerList = refreshPlayerList;
-        window.submitStudentInfo = submitStudentInfo;
-        window.startGuessingGame = startGuessingGame;
-        window.nextQuestion = nextQuestion;
-        window.endGame = endGame;
-        window.submitAnswer = submitAnswer;
-        window.revealAnswer = revealAnswer;
         
         // Initialize the game
         async function init() {
@@ -1087,6 +1077,15 @@
             }
         }
         
+        // Immediately assign functions to window object
+        window.startTeacherFlow = startTeacherFlow;
+        window.startStudentFlow = startStudentFlow;
+        window.testFirebaseConnection = testFirebaseConnection;
+        window.createGame = createGame;
+        window.joinGame = joinGame;
+        window.renderMenu = renderMenu;
+        window.toggleMusic = toggleMusic;
+        
         function showJoinSuccess() {
             const app = document.getElementById('app');
             app.innerHTML = `
@@ -1182,6 +1181,10 @@
                 alert('Failed to join game. Please try again.');
             }
         }
+        
+        // Add more global assignments
+        window.showJoinSuccess = showJoinSuccess;
+        window.submitStudentInfo = submitStudentInfo;
         
         function showStudentWaiting(name) {
             const app = document.getElementById('app');
