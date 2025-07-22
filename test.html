@@ -582,80 +582,80 @@
             const app = document.getElementById('app');
             
             app.innerHTML = `
-                <div class="min-h-screen bg-gradient-to-br from-purple-600 via-pink-600 to-red-600 p-4">
-                    <div class="max-w-6xl mx-auto">
+                <div class="game-screen bg-gradient-to-br from-purple-600 via-pink-600 to-red-600 p-3">
+                    <div class="max-w-7xl mx-auto h-full flex flex-col">
                         <!-- Branding Banner -->
-                        <div class="bg-gradient-to-r from-purple-500 to-pink-500 rounded-3xl shadow-2xl p-4 mb-6 text-center">
-                            <h1 class="text-3xl font-bold text-white">🎮 Gotten to Know You!</h1>
+                        <div class="bg-gradient-to-r from-purple-500 to-pink-500 rounded-2xl shadow-xl p-3 mb-3 text-center flex-shrink-0">
+                            <h1 class="text-2xl font-bold text-white">🎮 Gotten to Know You!</h1>
                         </div>
                         
-                        <div class="bg-white rounded-3xl shadow-2xl p-8">
+                        <div class="bg-white rounded-2xl shadow-xl p-4 flex-1 overflow-y-auto">
                             <!-- Header -->
-                            <div class="text-center mb-8">
-                                <div class="flex justify-between items-center mb-4">
-                                    <div class="bg-gradient-to-r from-blue-500 to-purple-500 text-white px-6 py-3 rounded-2xl text-lg font-bold">
+                            <div class="text-center mb-4">
+                                <div class="flex justify-between items-center mb-3">
+                                    <div class="bg-gradient-to-r from-blue-500 to-purple-500 text-white px-4 py-2 rounded-xl text-sm font-bold">
                                         Question ${currentQuestion + 1}/${gameQuestions.length}
                                     </div>
-                                    <div class="bg-gradient-to-r from-yellow-400 to-orange-500 text-white px-6 py-3 rounded-2xl text-lg font-bold">
+                                    <div class="bg-gradient-to-r from-yellow-400 to-orange-500 text-white px-4 py-2 rounded-xl text-sm font-bold">
                                         Game Code: ${gameCode}
                                     </div>
                                 </div>
                                 
-                                <div class="flex justify-center mb-6">
-                                    <div id="timer-display" class="w-24 h-24 rounded-full flex items-center justify-center text-3xl font-bold bg-gradient-to-r from-green-400 to-blue-500 text-white">
+                                <div class="flex justify-center mb-4">
+                                    <div id="timer-display" class="w-16 h-16 rounded-full flex items-center justify-center text-xl font-bold bg-gradient-to-r from-green-400 to-blue-500 text-white">
                                         ⏰ ${currentGame.timeLeft || 15}
                                     </div>
                                 </div>
                             </div>
                             
                             <!-- Main Question Display -->
-                            <div class="mb-8">
-                                <h2 class="text-3xl font-bold text-center text-gray-800 mb-8">Who wrote this fun fact?</h2>
-                                <div class="bg-gradient-to-br from-yellow-100 via-orange-100 to-pink-100 p-12 rounded-3xl border-4 border-yellow-300 shadow-2xl text-center transform hover:scale-102 transition-all duration-300">
-                                    <div class="bg-white bg-opacity-80 p-8 rounded-2xl border-2 border-yellow-200 shadow-inner">
-                                        <div class="text-6xl mb-6">💭</div>
-                                        <p class="text-4xl text-gray-900 italic font-bold leading-relaxed">"${question.fact}"</p>
-                                        <div class="mt-6 text-2xl">✨</div>
+                            <div class="mb-4">
+                                <h2 class="text-2xl font-bold text-center text-gray-800 mb-4">Who wrote this fun fact?</h2>
+                                <div class="bg-gradient-to-br from-yellow-100 via-orange-100 to-pink-100 p-6 rounded-2xl border-2 border-yellow-300 shadow-lg text-center">
+                                    <div class="bg-white bg-opacity-80 p-4 rounded-xl border border-yellow-200">
+                                        <div class="text-3xl mb-3">💭</div>
+                                        <p class="text-2xl text-gray-900 italic font-bold leading-relaxed">"${question.fact}"</p>
+                                        <div class="mt-3 text-xl">✨</div>
                                     </div>
                                 </div>
                             </div>
                             
                             <!-- Answer Options for Display -->
-                            <div class="grid grid-cols-2 gap-6 mb-8">
+                            <div class="grid grid-cols-2 gap-3 mb-4">
                                 ${question.options.map((option, index) => `
-                                    <div class="bg-gradient-to-r ${getOptionColor(index)} ${currentGame.showAnswer && index === question.correctIndex ? 'ring-4 ring-green-400' : ''} p-6 rounded-2xl text-center transform hover:scale-105 transition-all duration-300">
-                                        <div class="text-3xl font-bold text-white mb-3">${getOptionLetter(index)} ${currentGame.showAnswer && index === question.correctIndex ? '✅' : ''}</div>
-                                        <div class="text-xl font-semibold text-white">${option}</div>
-                                        ${currentGame.showAnswer && index === question.correctIndex ? '<div class="text-lg font-bold text-green-200 mt-2">CORRECT ANSWER!</div>' : ''}
+                                    <div class="bg-gradient-to-r ${getOptionColor(index)} ${currentGame.showAnswer && index === question.correctIndex ? 'ring-4 ring-green-400' : ''} p-4 rounded-xl text-center transition-all duration-300">
+                                        <div class="text-2xl font-bold text-white mb-2">${getOptionLetter(index)} ${currentGame.showAnswer && index === question.correctIndex ? '✅' : ''}</div>
+                                        <div class="text-lg font-semibold text-white">${option}</div>
+                                        ${currentGame.showAnswer && index === question.correctIndex ? '<div class="text-sm font-bold text-green-200 mt-1">CORRECT ANSWER!</div>' : ''}
                                     </div>
                                 `).join('')}
                             </div>
                             
                             <!-- Teacher Controls -->
-                            <div class="text-center space-y-4">
-                                <div class="bg-gray-100 p-4 rounded-2xl">
-                                    <p class="text-lg font-semibold text-gray-700">Students are answering on their devices...</p>
-                                    <p class="text-sm text-gray-600">Timer will advance automatically</p>
+                            <div class="text-center space-y-3">
+                                <div class="bg-gray-100 p-3 rounded-xl">
+                                    <p class="text-sm font-semibold text-gray-700">Students are answering on their devices...</p>
+                                    <p class="text-xs text-gray-600">Timer will advance automatically</p>
                                 </div>
                                 
-                                <div class="flex justify-center space-x-4">
-                                    <button id="next-question-btn" onclick="nextQuestion()" class="bg-gradient-to-r from-green-500 to-teal-500 hover:from-green-600 hover:to-teal-600 text-white font-semibold py-3 px-8 rounded-2xl transition-all duration-300 disabled:opacity-50" disabled>
+                                <div class="flex justify-center space-x-3">
+                                    <button id="next-question-btn" onclick="nextQuestion()" class="bg-gradient-to-r from-green-500 to-teal-500 hover:from-green-600 hover:to-teal-600 text-white font-semibold py-2 px-6 rounded-xl transition-all duration-300 disabled:opacity-50" disabled>
                                         Next Question (${currentGame.timeLeft || 15}s)
                                     </button>
                                     
-                                    <button id="music-toggle-game" onclick="toggleMusic()" class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg font-semibold">
+                                    <button id="music-toggle-game" onclick="toggleMusic()" class="bg-green-500 hover:bg-green-600 text-white px-3 py-2 rounded-lg font-semibold text-sm">
                                         🎵 Music
                                     </button>
                                 </div>
                                 
-                                <button onclick="endGame()" class="block mx-auto bg-red-500 hover:bg-red-600 text-white font-semibold py-2 px-6 rounded-2xl transition-all duration-300">
+                                <button onclick="endGame()" class="bg-red-500 hover:bg-red-600 text-white font-semibold py-2 px-4 rounded-xl transition-all duration-300 text-sm">
                                     End Game
                                 </button>
                             </div>
                         </div>
                         
                         <!-- Footer -->
-                        <div class="text-center mt-6 text-white text-sm">
+                        <div class="text-center mt-2 text-white text-xs flex-shrink-0">
                             <p>This app was developed with Claude AI by Galvin Ngo.</p>
                             <p>For any feedback, please reach out to gngo@ateneo.edu</p>
                         </div>
@@ -1416,21 +1416,30 @@
         
         async function submitAnswer(selectedIndex) {
             const question = currentGame.questions[currentGame.currentQuestion];
+            
+            // Mark that student has submitted answer
             studentAnswerSubmitted = true;
             
-            // Store the student's answer locally
+            // Store the student's answer locally for scoring
             const studentAnswer = {
                 questionIndex: currentGame.currentQuestion,
                 selectedIndex: selectedIndex,
                 isCorrect: selectedIndex === question.correctIndex
             };
             
-            // Update score locally but don't show result yet
+            // Update score locally
             if (selectedIndex === question.correctIndex) {
                 score = (score || 0) + 1;
             }
             
-            // Show simple "answer received" screen - NO indication of right/wrong
+            // Store answer for this question
+            localStorage.setItem(`answer_${currentGame.currentQuestion}`, selectedIndex.toString());
+            
+            // Show "answer received" screen immediately
+            showAnswerReceivedScreen(question.options[selectedIndex]);
+        }
+        
+        function showAnswerReceivedScreen(selectedAnswer) {
             const app = document.getElementById('app');
             app.innerHTML = `
                 <div class="game-screen bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-600 flex items-center justify-center p-4">
@@ -1438,22 +1447,27 @@
                         <div class="text-6xl mb-6">📝</div>
                         <h2 class="text-3xl font-bold text-gray-800 mb-4">Answer Received!</h2>
                         <p class="text-lg text-gray-600 mb-6">Your answer has been submitted successfully.</p>
-                        <p class="text-sm text-gray-500 mb-4">Wait for the teacher to reveal the correct answer...</p>
                         
-                        <div class="bg-gray-100 p-4 rounded-2xl">
-                            <div class="text-sm text-gray-600">Your answer:</div>
-                            <div class="text-xl font-bold text-gray-800">${question.options[selectedIndex]}</div>
+                        <div class="bg-gray-100 p-4 rounded-2xl mb-6">
+                            <div class="text-sm text-gray-600 mb-2">Your answer:</div>
+                            <div class="text-xl font-bold text-gray-800">${selectedAnswer}</div>
+                        </div>
+                        
+                        <div class="bg-blue-50 p-4 rounded-2xl mb-6">
+                            <p class="text-sm text-gray-600 mb-2">Please wait for the teacher to:</p>
+                            <p class="text-sm font-semibold text-blue-800">• Reveal the correct answer</p>
+                            <p class="text-sm font-semibold text-blue-800">• Move to the next question</p>
                         </div>
                         
                         <div class="mt-6">
                             <div class="w-12 h-12 mx-auto bg-blue-500 rounded-full animate-pulse"></div>
-                            <p class="text-xs text-gray-400 mt-2">Waiting for results...</p>
+                            <p class="text-xs text-gray-400 mt-2">Waiting for teacher...</p>
                         </div>
                     </div>
                 </div>
             `;
             
-            // Continue checking for game updates (answer reveal)
+            // Continue checking for game updates (next question)
             setTimeout(checkGameStatus, 2000);
         }
         
