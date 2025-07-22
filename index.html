@@ -12,14 +12,19 @@
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
             height: 100vh;
             width: 100vw;
+            overflow: hidden; /* Prevent page-level scrolling */
         }
         html {
             height: 100%;
+            overflow: hidden; /* Prevent HTML-level scrolling */
         }
         #app {
             height: 100vh;
             width: 100vw;
             overflow: hidden;
+            position: fixed; /* Lock app to viewport */
+            top: 0;
+            left: 0;
         }
         .loading {
             display: flex;
@@ -61,12 +66,18 @@
             width: 100vw;
             overflow-y: auto;
             overflow-x: hidden;
+            position: fixed;
+            top: 0;
+            left: 0;
         }
         /* Single-page screens (menu, join) should not scroll */
         .no-scroll {
             height: 100vh;
             width: 100vw;
             overflow: hidden;
+            position: fixed;
+            top: 0;
+            left: 0;
         }
     </style>
 </head>
