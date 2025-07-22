@@ -978,6 +978,22 @@
         } else {
             init();
         }
+        
+        // Ensure all global functions are available immediately
+        window.startTeacherFlow = startTeacherFlow;
+        window.startStudentFlow = startStudentFlow;
+        window.testFirebaseConnection = testFirebaseConnection;
+        window.createGame = createGame;
+        window.joinGame = joinGame;
+        window.renderMenu = renderMenu;
+        window.toggleMusic = toggleMusic;
+        window.refreshPlayerList = refreshPlayerList;
+        window.submitStudentInfo = submitStudentInfo;
+        window.startGuessingGame = startGuessingGame;
+        window.nextQuestion = nextQuestion;
+        window.endGame = endGame;
+        window.submitAnswer = submitAnswer;
+        window.revealAnswer = revealAnswer;
     </script>
 </body>
 </html>>
