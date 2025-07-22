@@ -1118,8 +1118,81 @@
             }
         }
         
+        // NUCLEAR OPTION: Override innerHTML to block answer screen on homepage
+        function blockAnswerScreenOnHomepage() {
+            const app = document.getElementById('app');
+            if (!app) return;
+            
+            // Store original innerHTML setter
+            const originalSetInnerHTML = Object.getOwnPropertyDescriptor(Element.prototype, 'innerHTML').set;
+            
+            // Override innerHTML setter to block answer screen
+            Object.defineProperty(app, 'innerHTML', {
+                set: function(value) {
+                    // Check if this is trying to set an answer screen and we're not in a game
+                    if (value.includes('Answer Received!') && (!currentGame || !currentGame.isStarted)) {
+                        console.log('🚫 BLOCKED: Attempt to show answer screen when not in game');
+                        console.log('🏠 FORCING: Menu display instead');
+                        
+                        // Force menu instead
+                        const menuHTML = `
+                            <div class="no-scroll bg-gradient-to-br from-purple-600 via-pink-600 to-blue-600 flex items-center justify-center p-4">
+                                <div class="bg-white rounded-3xl shadow-2xl p-8 max-w-md w-full text-center">
+                                    <div class="mb-8">
+                                        <div class="bg-gradient-to-r from-purple-500 to-pink-500 rounded-full w-20 h-20 flex items-center justify-center mx-auto mb-4 text-4xl">
+                                            👥
+                                        </div>
+                                        <h1 class="text-3xl font-bold text-gray-800 mb-2">Gotten to Know You!</h1>
+                                        <p class="text-lg text-purple-600 font-semibold mb-2">A quiz game about you</p>
+                                        <p class="text-gray-600">A fun classroom game to learn about each other</p>
+                                    </div>
+                                    
+                                    <div class="space-y-4">
+                                        <button onclick="startTeacherFlow()" class="w-full bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white font-semibold py-4 px-6 rounded-2xl transition-all duration-300 transform hover:scale-105 shadow-lg">
+                                            🎓 I'm a Teacher
+                                        </button>
+                                        
+                                        <button onclick="startStudentFlow()" class="w-full bg-gradient-to-r from-green-500 to-teal-500 hover:from-green-600 hover:to-teal-600 text-white font-semibold py-4 px-6 rounded-2xl transition-all duration-300 transform hover:scale-105 shadow-lg">
+                                            🎒 I'm a Student
+                                        </button>
+                                        
+                                        <button onclick="testFirebaseConnection()" class="w-full bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white font-semibold py-3 px-6 rounded-2xl transition-all duration-300 transform hover:scale-105 shadow-lg text-sm">
+                                            🔥 Test Firebase
+                                        </button>
+                                    </div>
+                                    
+                                    <div class="mt-6 text-xs text-gray-500">
+                                        v3.5 - Nuclear Block Edition
+                                    </div>
+                                    
+                                    <div class="mt-4">
+                                        <button onclick="window.location.reload()" class="text-xs bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded">
+                                            🔄 Refresh Page
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                        originalSetInnerHTML.call(this, menuHTML);
+                        return;
+                    }
+                    
+                    // For all other content, use original setter
+                    originalSetInnerHTML.call(this, value);
+                },
+                configurable: true
+            });
+            
+            console.log('🛡️ Answer screen blocker installed');
+        }
+        
         // Start the game immediately
         console.log('🎯 Starting game initialization...');
+        
+        // Install the answer screen blocker immediately
+        setTimeout(() => {
+            blockAnswerScreenOnHomepage();
+        }, 10);
         
         // IMMEDIATE forced menu display - bypass all other logic
         setTimeout(() => {
@@ -1153,7 +1226,7 @@
                             </div>
                             
                             <div class="mt-6 text-xs text-gray-500">
-                                v3.4 - Force Override Edition
+                                v3.5 - Nuclear Block Edition
                             </div>
                         </div>
                     </div>
