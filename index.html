@@ -577,9 +577,11 @@ function showTeacherLeaderboard() {
         }
         
         async function updateLeaderboard() {
+            console.log('📊 Teacher updating leaderboard...');
             const latestGame = await loadGameFromFirebase(gameCode);
             
             if (latestGame && latestGame.playerScores) {
+                console.log('📈 Player scores found:', Object.keys(latestGame.playerScores).length, 'players');
                 currentGame = latestGame;
                 
                 // Convert scores object to array and sort
@@ -594,6 +596,8 @@ function showTeacherLeaderboard() {
                         // Then by progress (questions answered)
                         return b.currentQuestion - a.currentQuestion;
                     });
+                
+                console.log('📋 Sorted players:', sortedPlayers.map(p => ({name: p.name, score: p.score, progress: p.currentQuestion})));
                 
                 const leaderboardEl = document.getElementById('leaderboard');
                 if (leaderboardEl) {
@@ -651,6 +655,16 @@ function showTeacherLeaderboard() {
                             `;
                         }).join('');
                     }
+                }
+            } else {
+                console.log('⚠️ No player scores found yet');
+                const leaderboardEl = document.getElementById('leaderboard');
+                if (leaderboardEl) {
+                    leaderboardEl.innerHTML = `
+                        <div class="bg-gray-100 p-4 rounded-xl text-center text-gray-500">
+                            Waiting for students to start answering...
+                        </div>
+                    `;
                 }
             }
             
