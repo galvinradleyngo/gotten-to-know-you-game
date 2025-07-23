@@ -258,6 +258,81 @@ function showTeacherLeaderboard() {
         
         console.log('✅ selectAnswer function assigned to global scope:', typeof window.selectAnswer);
         
+        // IMMEDIATE: Define showAnswerFeedback in global scope right here
+        window.showAnswerFeedback = function(selectedIndex, correctIndex, correctAnswer) {
+            console.log('🎭 showAnswerFeedback called (global version):', {selectedIndex, correctIndex, correctAnswer});
+            const isCorrect = selectedIndex === correctIndex;
+            
+            // Get quirky feedback messages
+            const correctMessages = [
+                "🎉 Awesome! You nailed it!",
+                "⭐ Brilliant! You're on fire!",
+                "🚀 Perfect! You're crushing this!",
+                "💪 Yes! You're a mind reader!",
+                "🎯 Bullseye! Spot on!",
+                "🏆 Champion! Keep it up!",
+                "✨ Amazing! You know your classmates!"
+            ];
+            
+            const wrongMessages = [
+                "🤔 Oops! Not quite, but keep going!",
+                "😅 Nice try! You'll get the next one!",
+                "🎲 Close one! Learning is part of the fun!",
+                "💭 Interesting guess! Keep exploring!",
+                "🎪 Plot twist! Better luck next time!",
+                "🌟 Good effort! You're still awesome!",
+                "🎨 Creative thinking! Try again!"
+            ];
+            
+            const message = isCorrect ? 
+                correctMessages[Math.floor(Math.random() * correctMessages.length)] :
+                wrongMessages[Math.floor(Math.random() * wrongMessages.length)];
+            
+            const app = document.getElementById('app');
+            app.innerHTML = `
+                <div class="game-screen bg-gradient-to-br from-${isCorrect ? 'green' : 'orange'}-600 via-${isCorrect ? 'emerald' : 'red'}-600 to-${isCorrect ? 'teal' : 'pink'}-600 p-4">
+                    <div class="max-w-md mx-auto flex items-center justify-center min-h-96">
+                        <div class="bg-white rounded-3xl shadow-2xl p-8 text-center">
+                            <div class="text-8xl mb-4">${isCorrect ? '🎉' : '🤗'}</div>
+                            <h2 class="text-3xl font-bold text-gray-800 mb-4">${isCorrect ? 'Correct!' : 'Not Quite!'}</h2>
+                            <p class="text-xl text-gray-600 mb-6">${message}</p>
+                            
+                            ${!isCorrect ? `
+                                <div class="bg-blue-50 p-4 rounded-2xl mb-6 border border-blue-200">
+                                    <p class="text-sm text-blue-700 mb-2">The correct answer was:</p>
+                                    <p class="text-lg font-bold text-blue-800">${correctAnswer}</p>
+                                </div>
+                            ` : ''}
+                            
+                            <div class="mt-6">
+                                <div class="w-16 h-16 mx-auto bg-${isCorrect ? 'green' : 'orange'}-500 rounded-full flex items-center justify-center text-white text-2xl font-bold animate-bounce">
+                                    ${isCorrect ? '✅' : '📚'}
+                                </div>
+                                <p class="text-lg text-gray-600 mt-4 font-semibold">Moving to next question...</p>
+                            </div>
+                            
+                            <!-- Debug Info -->
+                            <div class="mt-4 p-2 bg-gray-50 rounded text-xs text-gray-600 text-center">
+                                Global version - Advancing immediately...
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            console.log('⚡ Advancing to next question immediately (global version)...');
+            // Advance to next question immediately (no delay)
+            setTimeout(() => {
+                console.log('🔄 Calling showStudentCurrentQuestion (global version)');
+                if (window.showStudentCurrentQuestion && typeof window.showStudentCurrentQuestion === 'function') {
+                    window.showStudentCurrentQuestion();
+                } else {
+                    console.error('❌ showStudentCurrentQuestion not available in timeout');
+                    console.log('Available functions:', Object.keys(window).filter(key => key.includes('show')));
+                }
+            }, 100); // Just 100ms to allow the feedback to render briefly
+        };
+        
         // IMMEDIATE: Define showStudentCurrentQuestion in global scope right here
         window.showStudentCurrentQuestion = function() {
             console.log('🎯 showStudentCurrentQuestion called (global version v2.2)');
