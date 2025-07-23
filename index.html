@@ -268,13 +268,33 @@ function showTeacherLeaderboard() {
                 return;
             }
             
+            // Check localStorage thoroughly
             const studentId = localStorage.getItem('studentId');
+            const studentName = localStorage.getItem('studentName');
+            console.log('🔍 localStorage check:', { studentId, studentName });
+            console.log('🔍 All localStorage keys:', Object.keys(localStorage));
+            
             if (!studentId) {
-                console.log('❌ No student ID found');
-                return;
+                console.log('❌ No student ID found in localStorage');
+                // Let's try to find the student by checking if there's only one player
+                const players = currentGame.players || [];
+                console.log('🔍 Available players in game:', players.map(p => ({id: p.id, name: p.name})));
+                
+                if (players.length === 1) {
+                    console.log('🔧 Only one player found, using their ID');
+                    const playerId = players[0].id.toString();
+                    localStorage.setItem('studentId', playerId);
+                    localStorage.setItem('studentName', players[0].name);
+                    console.log('✅ Set localStorage to:', {studentId: playerId, studentName: players[0].name});
+                    // Try again with the ID we just set
+                    window.showStudentCurrentQuestion();
+                    return;
+                } else {
+                    console.log('❌ Cannot determine student ID - multiple or no players');
+                    return;
+                }
             }
             
-            console.log('🔍 Student ID:', studentId);
             console.log('📊 Available player scores:', Object.keys(currentGame.playerScores || {}));
             
             // Get student's current progress
