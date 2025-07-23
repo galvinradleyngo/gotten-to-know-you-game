@@ -258,6 +258,13 @@ function showTeacherLeaderboard() {
         
         console.log('✅ selectAnswer function assigned to global scope:', typeof window.selectAnswer);
         
+        // TEMPORARY: Add a placeholder for the old function to catch where it's being called
+        window.showStudentGameView = function() {
+            console.error('🚨 OLD FUNCTION CALLED: showStudentGameView - redirecting to showStudentCurrentQuestion');
+            console.trace('Call stack:');
+            showStudentCurrentQuestion();
+        };
+        
         // Firebase operations
         async function saveGameToFirebase(code, data) {
             try {
@@ -1065,11 +1072,17 @@ function showTeacherLeaderboard() {
                             <p class="text-lg font-semibold text-blue-800">Waiting for teacher to start the game...</p>
                         </div>
                         <div class="w-12 h-12 mx-auto bg-blue-500 rounded-full animate-pulse"></div>
+                        
+                        <!-- Debug Info -->
+                        <div class="mt-4 p-2 bg-gray-50 rounded text-xs text-gray-600 text-center">
+                            Code v2.0 | Checking game status every 2s
+                        </div>
                     </div>
                 </div>
             `;
             
             // Start checking for game updates
+            console.log('🎬 Starting checkGameStatus from waiting screen');
             checkGameStatus();
         }
         
@@ -1217,8 +1230,21 @@ function showTeacherLeaderboard() {
         }
         
         function showStudentResults() {
+            console.log('🏆 showStudentResults called');
+            const studentId = localStorage.getItem('studentId');
+            if (!studentId || !currentGame || !currentGame.playerScores) {
+                console.log('❌ Missing data for student results');
+                return;
+            }
+            
+            const studentProgress = currentGame.playerScores[studentId];
+            if (!studentProgress) {
+                console.log('❌ Student progress not found');
+                return;
+            }
+            
             const totalQuestions = currentGame.questions.length;
-            const percentage = Math.round((score / totalQuestions) * 100);
+            const percentage = Math.round((studentProgress.score / totalQuestions) * 100);
             
             const app = document.getElementById('app');
             app.innerHTML = `
@@ -1228,13 +1254,14 @@ function showTeacherLeaderboard() {
                             <div class="bg-gradient-to-r from-yellow-400 to-orange-500 rounded-full w-20 h-20 flex items-center justify-center mx-auto mb-4 text-4xl">
                                 🏆
                             </div>
-                            <h2 class="text-3xl font-bold text-gray-800 mb-2">Game Complete!</h2>
+                            <h2 class="text-3xl font-bold text-gray-800 mb-2">Quiz Complete!</h2>
+                            <p class="text-lg text-gray-600">Great job finishing all questions!</p>
                         </div>
                         
                         <div class="space-y-6">
                             <div class="bg-gradient-to-r from-yellow-100 to-orange-100 p-6 rounded-2xl">
-                                <h3 class="text-2xl font-bold text-gray-800 mb-2">Your Score</h3>
-                                <div class="text-5xl font-bold text-orange-600 mb-2">${score}</div>
+                                <h3 class="text-2xl font-bold text-gray-800 mb-2">Final Score</h3>
+                                <div class="text-5xl font-bold text-orange-600 mb-2">${studentProgress.score}</div>
                                 <div class="text-lg text-gray-600">out of ${totalQuestions} questions</div>
                                 <div class="text-2xl font-semibold text-gray-800 mt-2">${percentage}%</div>
                             </div>
@@ -1244,15 +1271,15 @@ function showTeacherLeaderboard() {
                             </div>
                             
                             <p class="text-lg text-gray-600">
-                                ${percentage >= 80 ? 'Amazing! You really know your classmates!' :
-                                  percentage >= 60 ? 'Great job! You know your classmates well.' :
-                                  percentage >= 40 ? 'Not bad! There\'s still more to learn.' :
-                                  'Time to get to know your classmates better!'}
+                                ${percentage >= 80 ? 'Outstanding! You really know your classmates!' :
+                                  percentage >= 60 ? 'Great job! You have good insight into your peers.' :
+                                  percentage >= 40 ? 'Not bad! There\'s always more to discover.' :
+                                  'Every guess teaches you something new about your classmates!'}
                             </p>
                             
-                            <button onclick="renderMenu()" class="w-full bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-semibold py-4 px-6 rounded-2xl transition-all duration-300 transform hover:scale-105 shadow-lg">
-                                🏠 Play Again
-                            </button>
+                            <div class="bg-blue-50 p-4 rounded-2xl">
+                                <p class="text-blue-800 font-semibold">Check the teacher's screen for the final leaderboard!</p>
+                            </div>
                         </div>
                     </div>
                 </div>
