@@ -262,7 +262,20 @@ function showTeacherLeaderboard() {
         window.showStudentGameView = function() {
             console.error('🚨 OLD FUNCTION CALLED: showStudentGameView - redirecting to showStudentCurrentQuestion');
             console.trace('Call stack:');
-            showStudentCurrentQuestion();
+            // Use window reference to access the global function
+            if (window.showStudentCurrentQuestion) {
+                window.showStudentCurrentQuestion();
+            } else {
+                console.error('❌ showStudentCurrentQuestion not available yet');
+                // Fallback: try again in a moment when functions are loaded
+                setTimeout(() => {
+                    if (window.showStudentCurrentQuestion) {
+                        window.showStudentCurrentQuestion();
+                    } else {
+                        console.error('❌ showStudentCurrentQuestion still not available');
+                    }
+                }, 100);
+            }
         };
         
         // Firebase operations
