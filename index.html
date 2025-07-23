@@ -201,6 +201,58 @@ function showTeacherLeaderboard() {
         let studentAnswerSubmitted = false;
         let studentCurrentQuestion = 0; // Track student's current question separately
         
+        // CRITICAL: Define selectAnswer in global scope immediately
+        window.selectAnswer = async function(answerIndex) {
+            console.log('📝 Student selected answer:', answerIndex);
+            
+            // Disable all buttons to prevent double-clicking
+            const buttons = document.querySelectorAll('button[id^="option-"]');
+            buttons.forEach(btn => btn.disabled = true);
+            
+            const studentId = localStorage.getItem('studentId');
+            if (!studentId) {
+                console.error('❌ No student ID found');
+                return;
+            }
+            
+            const studentProgress = currentGame.playerScores[studentId];
+            if (!studentProgress) {
+                console.error('❌ Student progress not found');
+                return;
+            }
+            
+            const currentQuestionIndex = studentProgress.currentQuestion;
+            const question = currentGame.questions[currentQuestionIndex];
+            const isCorrect = answerIndex === question.correctIndex;
+            
+            console.log('Question:', currentQuestionIndex + 1, 'Selected:', answerIndex, 'Correct:', question.correctIndex, 'Is Correct:', isCorrect);
+            
+            // Show immediate feedback
+            showAnswerFeedback(answerIndex, question.correctIndex, question.correctAnswer);
+            
+            // Update student progress
+            studentProgress.answers[currentQuestionIndex] = answerIndex;
+            if (isCorrect) {
+                studentProgress.score++;
+            }
+            studentProgress.currentQuestion++;
+            
+            // Check if completed all questions
+            if (studentProgress.currentQuestion >= currentGame.questions.length) {
+                studentProgress.completed = true;
+            }
+            
+            // Update Firebase
+            try {
+                await saveGameToFirebase(gameCode, currentGame);
+                console.log('✅ Updated student progress in Firebase');
+            } catch (error) {
+                console.error('❌ Error updating progress:', error);
+            }
+        };
+        
+        console.log('✅ selectAnswer function assigned to global scope:', typeof window.selectAnswer);
+        
         // Firebase operations
         async function saveGameToFirebase(code, data) {
             try {
@@ -293,9 +345,6 @@ function showTeacherLeaderboard() {
             `;
         }
         
-        // IMMEDIATE Global Assignment
-        window.renderMenu = renderMenu;
-        
         // Teacher flow
         function startTeacherFlow() {
             const app = document.getElementById('app');
@@ -318,9 +367,6 @@ function showTeacherLeaderboard() {
                 </div>
             `;
         }
-        
-        // IMMEDIATE Global Assignment
-        window.startTeacherFlow = startTeacherFlow;
         
         async function createGame() {
             gameCode = generateGameCode();
