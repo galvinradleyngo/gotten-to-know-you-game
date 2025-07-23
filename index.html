@@ -351,12 +351,138 @@
             currentGame.isStarted = true;
             currentGame.gamePhase = 'playing';
             currentGame.questions = gameQuestions;
-            currentGame.currentQuestion = 0;
-            currentGame.timeLeft = 15;
-            currentGame.showAnswer = false;
+            currentGame.playerScores = {}; // Track scores for each player
+            
+            // Initialize scores for all players
+            currentGame.players.forEach(player => {
+                currentGame.playerScores[player.id] = {
+                    name: player.name,
+                    score: 0,
+                    questionsAnswered: 0,
+                    answers: {} // Store answers for each question
+                };
+            });
             
             await saveGameToFirebase(gameCode, currentGame);
-            showTeacherQuestion();
+            showTeacherLeaderboard();
+        }
+        
+        function showTeacherLeaderboard() {
+            const app = document.getElementById('app');
+            
+            app.innerHTML = `
+                <div class="game-screen bg-gradient-to-br from-purple-600 via-pink-600 to-red-600 p-3">
+                    <div class="max-w-6xl mx-auto h-full flex flex-col">
+                        <div class="bg-gradient-to-r from-purple-500 to-pink-500 rounded-xl shadow-lg p-2 mb-2 text-center flex-shrink-0">
+                            <h1 class="text-lg font-bold text-white">🎮 Gotten to Know You! - Live Leaderboard</h1>
+                        </div>
+                        
+                        <div class="bg-white rounded-xl shadow-xl p-4 flex-1 overflow-y-auto">
+                            <div class="text-center mb-4">
+                                <div class="flex justify-between items-center mb-3">
+                                    <div class="bg-gradient-to-r from-blue-500 to-purple-500 text-white px-3 py-1 rounded-lg text-sm font-bold">
+                                        ${currentGame.questions.length} Questions Total
+                                    </div>
+                                    <div class="bg-gradient-to-r from-yellow-400 to-orange-500 text-white px-3 py-1 rounded-lg text-sm font-bold">
+                                        Code: ${gameCode}
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="mb-4">
+                                <h2 class="text-xl font-bold text-center text-gray-800 mb-3">🏆 Live Leaderboard</h2>
+                                <div id="leaderboard" class="space-y-2">
+                                    <div class="bg-gray-100 p-4 rounded-xl text-center text-gray-500">
+                                        Waiting for students to start answering...
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="text-center space-y-2">
+                                <div class="bg-blue-50 p-3 rounded-lg">
+                                    <p class="text-sm font-semibold text-blue-800">Students are answering at their own pace</p>
+                                    <p class="text-xs text-blue-600">Leaderboard updates automatically every 2 seconds</p>
+                                </div>
+                                
+                                <div class="flex justify-center space-x-2">
+                                    <button onclick="endGame()" class="bg-red-500 hover:bg-red-600 text-white font-semibold py-2 px-4 rounded-lg text-sm">
+                                        🛑 End Game
+                                    </button>
+                                    <button onclick="renderMenu()" class="bg-gray-500 hover:bg-gray-600 text-white font-semibold py-2 px-3 rounded-lg text-sm">
+                                        🏠 New Game
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="text-center mt-2 text-white text-xs flex-shrink-0">
+                            <p>Designed with Claude.ai by Galvin Ngo. For any feedback, email gngo@ateneo.edu</p>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            updateLeaderboard();
+        }
+        
+        async function updateLeaderboard() {
+            const latestGame = await loadGameFromFirebase(gameCode);
+            
+            if (latestGame && latestGame.playerScores) {
+                currentGame = latestGame;
+                
+                // Convert scores object to array and sort by score
+                const sortedPlayers = Object.values(latestGame.playerScores)
+                    .sort((a, b) => {
+                        if (b.score !== a.score) return b.score - a.score; // Higher score first
+                        return b.questionsAnswered - a.questionsAnswered; // More questions answered first
+                    });
+                
+                const leaderboardEl = document.getElementById('leaderboard');
+                if (leaderboardEl) {
+                    if (sortedPlayers.length === 0 || sortedPlayers.every(p => p.questionsAnswered === 0)) {
+                        leaderboardEl.innerHTML = `
+                            <div class="bg-gray-100 p-4 rounded-xl text-center text-gray-500">
+                                Waiting for students to start answering...
+                            </div>
+                        `;
+                    } else {
+                        leaderboardEl.innerHTML = sortedPlayers.map((player, index) => {
+                            const rank = index + 1;
+                            const percentage = latestGame.questions.length > 0 ? 
+                                Math.round((player.score / latestGame.questions.length) * 100) : 0;
+                            
+                            let rankEmoji = '🏅';
+                            if (rank === 1) rankEmoji = '🥇';
+                            else if (rank === 2) rankEmoji = '🥈';
+                            else if (rank === 3) rankEmoji = '🥉';
+                            
+                            return `
+                                <div class="bg-gradient-to-r from-yellow-50 to-orange-50 p-4 rounded-xl border-2 border-yellow-200">
+                                    <div class="flex items-center justify-between">
+                                        <div class="flex items-center">
+                                            <span class="text-2xl mr-3">${rankEmoji}</span>
+                                            <div>
+                                                <p class="text-lg font-bold text-gray-800">#${rank} ${player.name}</p>
+                                                <p class="text-sm text-gray-600">Progress: ${player.questionsAnswered}/${latestGame.questions.length} questions</p>
+                                            </div>
+                                        </div>
+                                        <div class="text-right">
+                                            <div class="text-2xl font-bold text-orange-600">${player.score}</div>
+                                            <div class="text-sm text-gray-600">${percentage}% correct</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            `;
+                        }).join('');
+                    }
+                }
+            }
+            
+            // Continue updating if still on leaderboard screen
+            if (document.getElementById('leaderboard')) {
+                setTimeout(updateLeaderboard, 2000);
+            }
         }
         
         function generateQuestions(players) {
