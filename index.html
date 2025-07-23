@@ -269,28 +269,28 @@ function showTeacherLeaderboard() {
             }
             
             // Check localStorage thoroughly
-            const studentId = localStorage.getItem('studentId');
+            let studentId = localStorage.getItem('studentId');
             const studentName = localStorage.getItem('studentName');
             console.log('🔍 localStorage check:', { studentId, studentName });
-            console.log('🔍 All localStorage keys:', Object.keys(localStorage));
             
             if (!studentId) {
                 console.log('❌ No student ID found in localStorage');
-                // Let's try to find the student by checking if there's only one player
+                // Try to find student by checking who just joined (most recent player)
                 const players = currentGame.players || [];
                 console.log('🔍 Available players in game:', players.map(p => ({id: p.id, name: p.name})));
                 
-                if (players.length === 1) {
-                    console.log('🔧 Only one player found, using their ID');
-                    const playerId = players[0].id.toString();
-                    localStorage.setItem('studentId', playerId);
-                    localStorage.setItem('studentName', players[0].name);
-                    console.log('✅ Set localStorage to:', {studentId: playerId, studentName: players[0].name});
-                    // Try again with the ID we just set
-                    window.showStudentCurrentQuestion();
-                    return;
+                if (players.length > 0) {
+                    // Use the most recent player (highest ID = most recent timestamp)
+                    const mostRecentPlayer = players.reduce((latest, player) => 
+                        player.id > latest.id ? player : latest
+                    );
+                    console.log('🔧 Using most recent player:', mostRecentPlayer);
+                    studentId = mostRecentPlayer.id.toString();
+                    localStorage.setItem('studentId', studentId);
+                    localStorage.setItem('studentName', mostRecentPlayer.name);
+                    console.log('✅ Set localStorage to most recent player:', {studentId, studentName: mostRecentPlayer.name});
                 } else {
-                    console.log('❌ Cannot determine student ID - multiple or no players');
+                    console.log('❌ No players found in game');
                     return;
                 }
             }
@@ -302,6 +302,27 @@ function showTeacherLeaderboard() {
             if (!studentProgress) {
                 console.log('❌ Student progress not found for ID:', studentId);
                 console.log('Available players:', currentGame.playerScores);
+                // Try to find by name if we have it
+                if (studentName) {
+                    console.log('🔧 Trying to find player by name:', studentName);
+                    const playerByName = Object.values(currentGame.playerScores || {}).find(p => 
+                        p.name.toLowerCase() === studentName.toLowerCase()
+                    );
+                    if (playerByName) {
+                        console.log('✅ Found player by name, updating localStorage');
+                        // Find the ID for this player
+                        const foundId = Object.keys(currentGame.playerScores).find(id => 
+                            currentGame.playerScores[id].name.toLowerCase() === studentName.toLowerCase()
+                        );
+                        if (foundId) {
+                            localStorage.setItem('studentId', foundId);
+                            studentId = foundId;
+                            // Try again with correct ID
+                            window.showStudentCurrentQuestion();
+                            return;
+                        }
+                    }
+                }
                 return;
             }
             
@@ -414,7 +435,7 @@ function showTeacherLeaderboard() {
                             
                             <!-- Debug Info -->
                             <div class="mt-4 p-2 bg-gray-50 rounded text-xs text-gray-600 text-center">
-                                Student ID: ${studentId} | Q${currentQuestionIndex + 1}/${totalQuestions} | Global Version
+                                Student: ${studentProgress.name} (${studentId}) | Q${currentQuestionIndex + 1}/${totalQuestions}
                             </div>
                         </div>
                     </div>
@@ -1136,7 +1157,7 @@ function showTeacherLeaderboard() {
                                 <textarea id="student-fact" placeholder="Share something interesting..." class="w-full px-4 py-3 border-2 border-gray-300 rounded-2xl focus:border-blue-500 focus:outline-none resize-none h-20" maxlength="150"></textarea>
                             </div>
                             
-                            <button onclick="submitStudentInfo()" class="w-full bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white font-semibold py-4 px-6 rounded-2xl transition-all duration-300 transform hover:scale-105 shadow-lg">
+                            <button onclick="console.log('🔘 Join button clicked'); submitStudentInfo()" class="w-full bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white font-semibold py-4 px-6 rounded-2xl transition-all duration-300 transform hover:scale-105 shadow-lg">
                                 ✅ Join Game
                             </button>
                             
