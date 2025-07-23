@@ -260,7 +260,7 @@ function showTeacherLeaderboard() {
         
         // IMMEDIATE: Define showStudentCurrentQuestion in global scope right here
         window.showStudentCurrentQuestion = function() {
-            console.log('🎯 showStudentCurrentQuestion called (global version v2.1)');
+            console.log('🎯 showStudentCurrentQuestion called (global version v2.2)');
             
             if (!currentGame || !currentGame.questions) {
                 console.log('❌ No questions available');
@@ -272,8 +272,6 @@ function showTeacherLeaderboard() {
             let studentId = localStorage.getItem('studentId');
             const studentName = localStorage.getItem('studentName');
             console.log('🔍 localStorage raw values:', { studentId, studentName });
-            console.log('🔍 localStorage studentId type:', typeof studentId);
-            console.log('🔍 localStorage studentName type:', typeof studentName);
             
             if (!studentId || studentId === 'null') {
                 console.log('❌ No valid student ID found in localStorage');
@@ -300,36 +298,31 @@ function showTeacherLeaderboard() {
             console.log('📊 Available player scores:', Object.keys(currentGame.playerScores || {}));
             
             // Get student's current progress
-            const studentProgress = currentGame.playerScores[studentId];
+            let studentProgress = currentGame.playerScores[studentId];
             if (!studentProgress) {
                 console.log('❌ Student progress not found for ID:', studentId);
                 console.log('Available players:', currentGame.playerScores);
-                // Try to find by name if we have it
-                if (studentName && studentName !== 'null') {
-                    console.log('🔧 Trying to find player by name:', studentName);
-                    const playerByName = Object.values(currentGame.playerScores || {}).find(p => 
-                        p.name.toLowerCase() === studentName.toLowerCase()
-                    );
-                    if (playerByName) {
-                        console.log('✅ Found player by name, updating localStorage');
-                        // Find the ID for this player
-                        const foundId = Object.keys(currentGame.playerScores).find(id => 
-                            currentGame.playerScores[id].name.toLowerCase() === studentName.toLowerCase()
-                        );
-                        if (foundId) {
-                            localStorage.setItem('studentId', foundId);
-                            studentId = foundId;
-                            console.log('🔄 Trying again with correct ID:', foundId);
-                            // Try again with correct ID
-                            window.showStudentCurrentQuestion();
-                            return;
-                        }
-                    }
-                }
                 return;
             }
             
-            console.log('📈 Student progress:', studentProgress);
+            console.log('📈 Student progress (raw):', studentProgress);
+            
+            // FIX: Handle old data structure - convert questionsAnswered to currentQuestion
+            if (studentProgress.questionsAnswered !== undefined && studentProgress.currentQuestion === undefined) {
+                console.log('🔧 Converting old data structure: questionsAnswered → currentQuestion');
+                studentProgress.currentQuestion = studentProgress.questionsAnswered || 0;
+                // Update Firebase with corrected structure
+                currentGame.playerScores[studentId] = studentProgress;
+                saveGameToFirebase(gameCode, currentGame);
+            }
+            
+            // Ensure currentQuestion exists
+            if (studentProgress.currentQuestion === undefined) {
+                console.log('🔧 Setting default currentQuestion to 0');
+                studentProgress.currentQuestion = 0;
+            }
+            
+            console.log('📈 Student progress (fixed):', studentProgress);
             
             if (studentProgress.completed) {
                 console.log('✅ Student completed, showing completion screen');
@@ -438,14 +431,14 @@ function showTeacherLeaderboard() {
                             
                             <!-- Debug Info -->
                             <div class="mt-4 p-2 bg-gray-50 rounded text-xs text-gray-600 text-center">
-                                Student: ${studentProgress.name} (${studentId}) | Q${currentQuestionIndex + 1}/${totalQuestions} | v2.1
+                                Student: ${studentProgress.name} (${studentId}) | Q${currentQuestionIndex + 1}/${totalQuestions} | v2.2
                             </div>
                         </div>
                     </div>
                 </div>
             `;
             
-            console.log('✅ Question rendered successfully (global version v2.1)');
+            console.log('✅ Question rendered successfully (global version v2.2)');
         };
         
         // TEMPORARY: Add a placeholder for the old function to catch where it's being called
