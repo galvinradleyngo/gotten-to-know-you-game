@@ -1,4 +1,103 @@
-<!DOCTYPE html>
+function showTeacherLeaderboard() {
+            const app = document.getElementById('app');
+            
+            // Calculate time remaining display
+            let timeDisplay = '';
+            if (currentGame.timeLimit > 0) {
+                const startTime = new Date(currentGame.startTime);
+                const now = new Date();
+                const elapsed = Math.floor((now - startTime) / 1000 / 60); // minutes elapsed
+                const remaining = currentGame.timeLimit - elapsed;
+                
+                if (remaining <= 0) {
+                    timeDisplay = '<div class="bg-red-500 text-white px-4 py-2 rounded-lg text-lg font-bold animate-pulse">⏰ TIME UP!</div>';
+                } else {
+                    timeDisplay = `<div class="bg-blue-500 text-white px-4 py-2 rounded-lg text-lg font-bold">⏱️ ${remaining} minutes remaining</div>`;
+                }
+            } else {
+                timeDisplay = '<div class="bg-green-500 text-white px-4 py-2 rounded-lg text-lg font-bold">♾️ No Time Limit</div>';
+            }
+            
+            app.innerHTML = `
+                <div class="game-screen bg-gradient-to-br from-purple-600 via-pink-600 to-red-600 p-3">
+                    <div class="max-w-6xl mx-auto h-full flex flex-col">
+                        <div class="bg-gradient-to-r from-purple-500 to-pink-500 rounded-xl shadow-lg p-2 mb-2 text-center flex-shrink-0">
+                            <h1 class="text-lg font-bold text-white">🎮 Gotten to Know You! - Live Progress</h1>
+                        </div>
+                        
+                        <div class="bg-white rounded-xl shadow-xl p-4 flex-1 overflow-y-auto">
+                            <div class="text-center mb-4">
+                                <div class="flex justify-between items-center mb-3">
+                                    <div class="bg-gradient-to-r from-blue-500 to-purple-500 text-white px-3 py-1 rounded-lg text-sm font-bold">
+                                        ${currentGame.questions.length} Questions Total
+                                    </div>
+                                    ${timeDisplay}
+                                    <div class="bg-gradient-to-r from-yellow-400 to-orange-500 text-white px-3 py-1 rounded-lg text-sm font-bold">
+                                        Code: ${gameCode}
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="mb-4">
+                                <h2 class="text-xl font-bold text-center text-gray-800 mb-3">📊 Live Progress & Leaderboard</h2>
+                                <div id="leaderboard" class="space-y-3">
+                                    <div class="bg-gray-100 p-4 rounded-xl text-center text-gray-500">
+                                        Loading student progress...
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="text-center space-y-2">
+                                <div class="bg-blue-50 p-3 rounded-lg">
+                                    <p class="text-sm font-semibold text-blue-800">Students progress at their own pace</p>
+                                    <p class="text-xs text-blue-600">Updates automatically every 2 seconds</p>
+                                </div>
+                                
+                                <div class="flex justify-center space-x-2">
+                                    <button onclick="endGame()" class="bg-red-500 hover:bg-red-600 text-white font-semibold py-2 px-4 rounded-lg text-sm">
+                                        🛑 End Game
+                                    </button>
+                                    <button onclick="renderMenu()" class="bg-gray-500 hover:bg-gray-600 text-white font-semibold py-2 px-3 rounded-lg text-sm">
+                                        🏠 New Game
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="text-center mt-2 text-white text-xs flex-shrink-0">
+                            <p>Designed with Claude.ai by Galvin Ngo. For any feedback, email gngo@ateneo.edu</p>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            updateLeaderboard();
+        }
+        
+        async function updateLeaderboard() {
+            const latestGame = await loadGameFromFirebase(gameCode);
+            
+            if (latestGame && latestGame.playerScores) {
+                currentGame = latestGame;
+                
+                // Convert scores object to array and sort
+                const sortedPlayers = Object.values(latestGame.playerScores)
+                    .sort((a, b) => {
+                        // First sort by completion status
+                        if (a.completed !== b.completed) {
+                            return b.completed - a.completed; // Completed players first
+                        }
+                        // Then by score
+                        if (b.score !== a.score) return b.score - a.score;
+                        // Then by progress (questions answered)
+                        return b.currentQuestion - a.currentQuestion;
+                    });
+                
+                const leaderboardEl = document.getElementById('leaderboard');
+                if (leaderboardEl) {
+                    if (sortedPlayers.length === 0) {
+                        leaderboardEl.innerHTML = `
+                            <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -194,6 +293,9 @@
             `;
         }
         
+        // IMMEDIATE Global Assignment
+        window.renderMenu = renderMenu;
+        
         // Teacher flow
         function startTeacherFlow() {
             const app = document.getElementById('app');
@@ -216,6 +318,9 @@
                 </div>
             `;
         }
+        
+        // IMMEDIATE Global Assignment
+        window.startTeacherFlow = startTeacherFlow;
         
         async function createGame() {
             gameCode = generateGameCode();
@@ -431,46 +536,70 @@
             if (latestGame && latestGame.playerScores) {
                 currentGame = latestGame;
                 
-                // Convert scores object to array and sort by score
+                // Convert scores object to array and sort
                 const sortedPlayers = Object.values(latestGame.playerScores)
                     .sort((a, b) => {
-                        if (b.score !== a.score) return b.score - a.score; // Higher score first
-                        return b.questionsAnswered - a.questionsAnswered; // More questions answered first
+                        // First sort by completion status
+                        if (a.completed !== b.completed) {
+                            return b.completed - a.completed; // Completed players first
+                        }
+                        // Then by score
+                        if (b.score !== a.score) return b.score - a.score;
+                        // Then by progress (questions answered)
+                        return b.currentQuestion - a.currentQuestion;
                     });
                 
                 const leaderboardEl = document.getElementById('leaderboard');
                 if (leaderboardEl) {
-                    if (sortedPlayers.length === 0 || sortedPlayers.every(p => p.questionsAnswered === 0)) {
+                    if (sortedPlayers.length === 0) {
                         leaderboardEl.innerHTML = `
                             <div class="bg-gray-100 p-4 rounded-xl text-center text-gray-500">
-                                Waiting for students to start answering...
+                                Waiting for students to start...
                             </div>
                         `;
                     } else {
                         leaderboardEl.innerHTML = sortedPlayers.map((player, index) => {
                             const rank = index + 1;
-                            const percentage = latestGame.questions.length > 0 ? 
-                                Math.round((player.score / latestGame.questions.length) * 100) : 0;
+                            const totalQuestions = latestGame.questions.length;
+                            const percentage = totalQuestions > 0 ? 
+                                Math.round((player.score / totalQuestions) * 100) : 0;
+                            const progress = Math.round((player.currentQuestion / totalQuestions) * 100);
                             
                             let rankEmoji = '🏅';
                             if (rank === 1) rankEmoji = '🥇';
                             else if (rank === 2) rankEmoji = '🥈';
                             else if (rank === 3) rankEmoji = '🥉';
                             
+                            let statusBadge = '';
+                            if (player.completed) {
+                                statusBadge = '<span class="bg-green-500 text-white px-2 py-1 rounded-full text-xs font-bold">✅ COMPLETE</span>';
+                            } else if (player.currentQuestion > 0) {
+                                statusBadge = '<span class="bg-blue-500 text-white px-2 py-1 rounded-full text-xs font-bold">🔄 IN PROGRESS</span>';
+                            } else {
+                                statusBadge = '<span class="bg-gray-400 text-white px-2 py-1 rounded-full text-xs font-bold">⏳ NOT STARTED</span>';
+                            }
+                            
                             return `
                                 <div class="bg-gradient-to-r from-yellow-50 to-orange-50 p-4 rounded-xl border-2 border-yellow-200">
-                                    <div class="flex items-center justify-between">
+                                    <div class="flex items-center justify-between mb-3">
                                         <div class="flex items-center">
                                             <span class="text-2xl mr-3">${rankEmoji}</span>
                                             <div>
                                                 <p class="text-lg font-bold text-gray-800">#${rank} ${player.name}</p>
-                                                <p class="text-sm text-gray-600">Progress: ${player.questionsAnswered}/${latestGame.questions.length} questions</p>
+                                                <p class="text-sm text-gray-600">Score: ${player.score}/${totalQuestions} (${percentage}%)</p>
                                             </div>
                                         </div>
                                         <div class="text-right">
-                                            <div class="text-2xl font-bold text-orange-600">${player.score}</div>
-                                            <div class="text-sm text-gray-600">${percentage}% correct</div>
+                                            ${statusBadge}
                                         </div>
+                                    </div>
+                                    
+                                    <!-- Progress Bar -->
+                                    <div class="w-full bg-gray-200 rounded-full h-2 mb-2">
+                                        <div class="bg-gradient-to-r from-green-400 to-blue-500 h-2 rounded-full transition-all duration-500" style="width: ${progress}%"></div>
+                                    </div>
+                                    <div class="text-xs text-gray-600 text-center">
+                                        Progress: ${player.currentQuestion}/${totalQuestions} questions (${progress}%)
                                     </div>
                                 </div>
                             `;
@@ -484,6 +613,18 @@
                 setTimeout(updateLeaderboard, 2000);
             }
         }
+        
+        // Add missing global function assignments
+        window.renderMenu = renderMenu;
+        window.startTeacherFlow = startTeacherFlow;
+        window.startStudentFlow = startStudentFlow;
+        window.createGame = createGame;
+        window.startGame = startGame;
+        window.joinGame = joinGame;
+        window.submitStudentInfo = submitStudentInfo;
+        window.endGame = endGame;
+        window.showJoinSuccess = showJoinSuccess;
+        window.selectAnswer = selectAnswer;
         
         function generateQuestions(players) {
             return players.map((player, index) => {
