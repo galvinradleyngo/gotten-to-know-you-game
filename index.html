@@ -258,24 +258,158 @@ function showTeacherLeaderboard() {
         
         console.log('✅ selectAnswer function assigned to global scope:', typeof window.selectAnswer);
         
+        // IMMEDIATE: Define showStudentCurrentQuestion in global scope right here
+        window.showStudentCurrentQuestion = function() {
+            console.log('🎯 showStudentCurrentQuestion called (global version)');
+            
+            if (!currentGame || !currentGame.questions) {
+                console.log('❌ No questions available');
+                console.log('Current game state:', currentGame);
+                return;
+            }
+            
+            const studentId = localStorage.getItem('studentId');
+            if (!studentId) {
+                console.log('❌ No student ID found');
+                return;
+            }
+            
+            console.log('🔍 Student ID:', studentId);
+            console.log('📊 Available player scores:', Object.keys(currentGame.playerScores || {}));
+            
+            // Get student's current progress
+            const studentProgress = currentGame.playerScores[studentId];
+            if (!studentProgress) {
+                console.log('❌ Student progress not found for ID:', studentId);
+                console.log('Available players:', currentGame.playerScores);
+                return;
+            }
+            
+            console.log('📈 Student progress:', studentProgress);
+            
+            if (studentProgress.completed) {
+                console.log('✅ Student completed, showing completion screen');
+                if (window.showStudentCompleted) {
+                    window.showStudentCompleted();
+                } else {
+                    console.log('❌ showStudentCompleted not available');
+                }
+                return;
+            }
+            
+            const currentQuestionIndex = studentProgress.currentQuestion;
+            const totalQuestions = currentGame.questions.length;
+            
+            console.log('📝 Current question index:', currentQuestionIndex, 'of', totalQuestions);
+            
+            if (currentQuestionIndex >= totalQuestions) {
+                console.log('🏁 All questions answered, showing completion');
+                if (window.showStudentCompleted) {
+                    window.showStudentCompleted();
+                } else {
+                    console.log('❌ showStudentCompleted not available');
+                }
+                return;
+            }
+            
+            const question = currentGame.questions[currentQuestionIndex];
+            if (!question) {
+                console.error('❌ Question not found at index:', currentQuestionIndex);
+                console.log('Available questions:', currentGame.questions);
+                return;
+            }
+            
+            console.log('❓ Current question:', question);
+            
+            // Calculate time remaining
+            let timeDisplay = '';
+            if (currentGame.timeLimit > 0) {
+                const startTime = new Date(currentGame.startTime);
+                const now = new Date();
+                const elapsed = Math.floor((now - startTime) / 1000 / 60); // minutes elapsed
+                const remaining = currentGame.timeLimit - elapsed;
+                
+                if (remaining <= 0) {
+                    timeDisplay = '<div class="bg-red-500 text-white px-3 py-1 rounded-lg text-sm font-bold animate-pulse">⏰ TIME UP!</div>';
+                } else {
+                    timeDisplay = `<div class="bg-blue-500 text-white px-3 py-1 rounded-lg text-sm font-bold">⏱️ ${remaining} min left</div>`;
+                }
+            }
+            
+            const progressPercent = Math.round((currentQuestionIndex / totalQuestions) * 100);
+            
+            console.log('🎯 Rendering question', currentQuestionIndex + 1, 'of', totalQuestions);
+            
+            const app = document.getElementById('app');
+            app.innerHTML = `
+                <div class="game-screen bg-gradient-to-br from-purple-600 via-pink-600 to-red-600 p-4">
+                    <div class="max-w-md mx-auto">
+                        <div class="bg-white rounded-3xl shadow-2xl p-6">
+                            <!-- Header with progress -->
+                            <div class="text-center mb-6">
+                                <div class="flex justify-between items-center mb-4">
+                                    <div class="bg-gradient-to-r from-blue-500 to-purple-500 text-white px-3 py-1 rounded-lg text-sm font-bold">
+                                        Question ${currentQuestionIndex + 1}/${totalQuestions}
+                                    </div>
+                                    ${timeDisplay}
+                                </div>
+                                
+                                <!-- Progress Bar -->
+                                <div class="w-full bg-gray-200 rounded-full h-3 mb-4">
+                                    <div class="bg-gradient-to-r from-green-400 to-blue-500 h-3 rounded-full transition-all duration-500" style="width: ${progressPercent}%"></div>
+                                </div>
+                                <div class="text-sm text-gray-600">${progressPercent}% Complete</div>
+                            </div>
+                            
+                            <!-- Question -->
+                            <div class="mb-6">
+                                <div class="bg-gradient-to-br from-yellow-100 via-orange-100 to-pink-100 p-4 rounded-xl border-2 border-yellow-300 shadow-md text-center">
+                                    <div class="bg-white bg-opacity-90 p-3 rounded-lg border border-yellow-200">
+                                        <div class="text-2xl mb-2">🤔</div>
+                                        <p class="text-lg text-gray-900 italic font-semibold">"${question.fact}"</p>
+                                        <p class="text-sm text-gray-600 mt-2">Who wrote this fun fact?</p>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Answer Options -->
+                            <div class="space-y-3 mb-6">
+                                ${question.options.map((option, index) => `
+                                    <button onclick="selectAnswer(${index})" 
+                                            class="w-full p-4 rounded-2xl font-semibold text-lg transition-all duration-200 ${getStudentOptionStyle(index)} hover:scale-105 hover:shadow-lg"
+                                            id="option-${index}">
+                                        <span class="text-2xl font-bold mr-3">${getOptionLetter(index)}</span>
+                                        ${option}
+                                    </button>
+                                `).join('')}
+                            </div>
+                            
+                            <!-- Score Display -->
+                            <div class="text-center">
+                                <div class="bg-gradient-to-r from-purple-100 to-pink-100 px-4 py-2 rounded-xl border border-purple-200">
+                                    <span class="text-sm text-purple-600">Your Score: </span>
+                                    <span class="font-bold text-purple-800">${studentProgress.score}/${currentQuestionIndex}</span>
+                                </div>
+                            </div>
+                            
+                            <!-- Debug Info -->
+                            <div class="mt-4 p-2 bg-gray-50 rounded text-xs text-gray-600 text-center">
+                                Student ID: ${studentId} | Q${currentQuestionIndex + 1}/${totalQuestions} | Global Version
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            console.log('✅ Question rendered successfully (global version)');
+        };
+        
         // TEMPORARY: Add a placeholder for the old function to catch where it's being called
         window.showStudentGameView = function() {
             console.error('🚨 OLD FUNCTION CALLED: showStudentGameView - redirecting to showStudentCurrentQuestion');
             console.trace('Call stack:');
-            // Use window reference to access the global function
-            if (window.showStudentCurrentQuestion) {
-                window.showStudentCurrentQuestion();
-            } else {
-                console.error('❌ showStudentCurrentQuestion not available yet');
-                // Fallback: try again in a moment when functions are loaded
-                setTimeout(() => {
-                    if (window.showStudentCurrentQuestion) {
-                        window.showStudentCurrentQuestion();
-                    } else {
-                        console.error('❌ showStudentCurrentQuestion still not available');
-                    }
-                }, 100);
-            }
+            // Now this should work since we defined it above
+            window.showStudentCurrentQuestion();
         };
         
         // Firebase operations
